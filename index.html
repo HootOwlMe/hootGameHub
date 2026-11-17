@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>home ♡ · pick your game</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ============ theme ============ */
+:root{
+  --sky-day-top:#b9e2f5; --sky-day-bot:#fff3da;
+  --sky-night-top:#171e3c; --sky-night-bot:#3a3560;
+  --cloud:#ffffff; --cloud-o:.95;
+  --ink:#4a3f5c; --ink-soft:rgba(74,63,92,.7);
+  --card-bg:rgba(255,255,255,.82);
+  --card-line:rgba(74,63,92,.12);
+  --coral:#ff8fa3; --butter:#ffd97a;
+}
+html.night{
+  --cloud:#6f6a9e; --cloud-o:.55;
+  --ink:#f2eedb; --ink-soft:rgba(242,238,219,.7);
+  --card-bg:rgba(30,35,66,.72);
+  --card-line:rgba(242,238,219,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Nunito',sans-serif; color:var(--ink);
+  min-height:100vh; overflow-x:hidden;
+  background:linear-gradient(var(--sky-day-top),var(--sky-day-bot) 80%);
+  transition:color .9s ease;
+}
+html.night body{background:linear-gradient(var(--sky-night-top),var(--sky-night-bot) 82%)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px dashed var(--coral);outline-offset:4px;border-radius:10px}
+
+/* ============ scenery ============ */
+.scene{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#stars{position:absolute;inset:0;opacity:0;transition:opacity 1.6s ease}
+html.night #stars{opacity:1}
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--d,2.4s) ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.2}to{opacity:1}}
+
+.orb{position:absolute;top:7%;right:8%;width:clamp(52px,8vw,80px);aspect-ratio:1;border-radius:50%;transition:opacity 1.2s ease,transform 1.4s ease}
+.sun{background:radial-gradient(circle at 38% 35%,#fff7cf,#ffd97a 62%,#ffc95c);box-shadow:0 0 44px 14px rgba(255,217,122,.55)}
+.moon{opacity:0;transform:rotate(-90deg) scale(.6);background:radial-gradient(circle at 36% 32%,#fdfaf0,#dcd8ee 70%);box-shadow:0 0 34px 8px rgba(230,225,255,.3)}
+.moon i{position:absolute;background:#c9c3e2;border-radius:50%;opacity:.7}
+.moon i:nth-child(1){width:26%;height:26%;left:24%;top:30%}
+.moon i:nth-child(2){width:16%;height:16%;left:58%;top:52%}
+.moon i:nth-child(3){width:11%;height:11%;left:44%;top:16%}
+html.night .sun{opacity:0;transform:rotate(90deg) scale(.6)}
+html.night .moon{opacity:1;transform:none}
+
+.cloud{position:absolute;background:var(--cloud);border-radius:40px;transition:background 1.2s,opacity 1.2s;animation:drift linear infinite}
+.cloud::before,.cloud::after{content:"";position:absolute;background:inherit;border-radius:50%;transition:background 1.2s,opacity 1.2s}
+.cloud::before{width:52%;aspect-ratio:1;left:14%;bottom:38%}
+.cloud::after{width:36%;aspect-ratio:1;left:52%;bottom:52%}
+.c1{top:12%;width:150px;height:44px;opacity:var(--cloud-o);animation-duration:80s}
+.c2{top:28%;width:110px;height:34px;opacity:calc(var(--cloud-o)*.8);animation-duration:110s;animation-delay:-45s}
+.c3{top:46%;width:90px;height:28px;opacity:calc(var(--cloud-o)*.6);animation-duration:95s;animation-delay:-70s}
+.c4{top:62%;width:130px;height:38px;opacity:calc(var(--cloud-o)*.7);animation-duration:120s;animation-delay:-25s}
+.c5{top:78%;width:100px;height:32px;opacity:calc(var(--cloud-o)*.45);animation-duration:145s;animation-delay:-95s}
+@keyframes drift{from{transform:translateX(-30vw)}to{transform:translateX(125vw)}}
+
+/* ============ night toggle ============ */
+#nightToggle{position:fixed;top:18px;right:18px;z-index:5;width:46px;height:46px;border-radius:50%;
+  background:var(--card-bg);border:1.5px solid var(--card-line);font-size:22px;line-height:1;
+  box-shadow:0 4px 14px rgba(0,0,0,.12);transition:transform .3s ease}
+#nightToggle:hover{transform:rotate(-18deg) scale(1.08)}
+
+/* ============ layout ============ */
+.wrap{position:relative;z-index:1;max-width:1060px;margin:0 auto;padding:clamp(40px,7vh,72px) 20px 60px}
+
+header{text-align:center;margin-bottom:clamp(30px,5vh,52px)}
+.overline{font-family:'Fredoka',sans-serif;font-weight:600;letter-spacing:.18em;text-transform:uppercase;font-size:13px;color:var(--ink-soft);margin-bottom:10px}
+h1{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(42px,7vw,68px);line-height:1.05}
+h1 .heart{color:var(--coral)}
+.tagline{margin-top:12px;font-size:clamp(15px,2.2vw,18px);font-weight:600;color:var(--ink-soft)}
+
+.count-pill{display:inline-flex;align-items:center;gap:8px;margin-top:18px;padding:7px 16px;border-radius:999px;
+  background:var(--card-bg);border:1.5px solid var(--card-line);font-weight:800;font-size:13.5px}
+.count-pill .dot{width:8px;height:8px;border-radius:50%;background:#6fcf97;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.6);opacity:.5}}
+
+/* ============ game list (expandable) ============ */
+.game-list{display:grid;gap:18px}
+
+.card{background:var(--card-bg);border:1.5px solid var(--card-line);border-radius:22px;overflow:hidden;
+  box-shadow:0 6px 20px rgba(74,63,92,.10);backdrop-filter:blur(6px);transition:border-color .25s ease}
+.card:hover{border-color:var(--acc)}
+
+.card-head{display:flex;align-items:center;gap:16px;width:100%;text-align:left;padding:18px 20px}
+.card-num{font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;color:#fff;background:var(--acc);
+  min-width:38px;height:38px;border-radius:12px;display:grid;place-items:center;padding:0 6px}
+.card-icon{font-size:34px;line-height:1;width:58px;height:58px;flex:none;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--acc) 16%,transparent);border-radius:16px}
+.card-titles{flex:1;min-width:0}
+.card-title{font-family:'Fredoka',sans-serif;font-weight:600;font-size:clamp(19px,2.6vw,23px)}
+.card-tagline{font-size:14px;font-weight:600;color:var(--ink-soft);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chev{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  border:1.5px solid var(--card-line);transition:transform .35s ease,background .25s ease;font-size:15px}
+.card.open .chev{transform:rotate(180deg);background:color-mix(in srgb,var(--acc) 18%,transparent)}
+
+/* smooth expand/collapse via grid rows */
+.card-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s ease}
+.card.open .card-body{grid-template-rows:1fr}
+.card-inner{overflow:hidden}
+.card-content{padding:2px 20px 22px;display:flex;flex-direction:column;gap:16px}
+
+.desc{font-size:15.5px;line-height:1.55;font-weight:600;color:var(--ink)}
+
+.howto{list-style:none;display:flex;flex-wrap:wrap;gap:8px}
+.howto li{font-size:13px;font-weight:800;padding:7px 13px;border-radius:999px;
+  background:color-mix(in srgb,var(--acc) 12%,transparent);border:1.5px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+
+.play-btn{align-self:flex-start;display:inline-flex;align-items:center;gap:9px;
+  font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:#fff;text-decoration:none;
+  background:var(--acc);padding:12px 26px;border-radius:999px;box-shadow:0 5px 16px color-mix(in srgb,var(--acc) 45%,transparent);
+  transition:transform .2s ease,box-shadow .2s ease}
+.play-btn:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 8px 22px color-mix(in srgb,var(--acc) 55%,transparent)}
+.play-btn:active{transform:scale(.97)}
+
+footer{text-align:center;margin-top:46px;color:var(--ink-soft);font-size:13.5px;font-weight:700}
+footer .heart{color:var(--coral)}
+</style>
+<script>
+/* apply saved night mode before the page paints, so there's no flash */
+try { if (localStorage.getItem("game-room-night") === "1") document.documentElement.classList.add("night"); } catch (e) {}
+</script>
+</head>
+<body>
+
+<div class="scene" aria-hidden="true">
+  <div id="stars"></div>
+  <div class="orb sun"></div>
+  <div class="orb moon"><i></i><i></i><i></i></div>
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+  <div class="cloud c4"></div>
+  <div class="cloud c5"></div>
+</div>
+
+<button id="nightToggle" aria-label="toggle night mode">🌙</button>
+
+<div class="wrap">
+  <header>
+    <p class="overline">welcome to</p>
+    <h1>the game room<span class="heart"> ♡</span></h1>
+    <p class="tagline">several tiny worlds down below. pick one and have some fun</p>
+    <div class="count-pill"><span class="dot"></span><span id="gameCount">3 games</span> · more coming soon</div>
+  </header>
+
+  <!-- game cards are rendered here from the GAMES list below -->
+  <main id="gameList" class="game-list" aria-label="list of games"></main>
+
+  <footer>made with <span class="heart">♡</span></footer>
+</div>
+
+<script>
+/* ================================================================
+   GAMES LIST: to add a new game, just append an object here. 👇
+   The page renders cards from this array, so the list grows for free.
+   ================================================================ */
+const GAMES = [
+  {
+    num: "01",
+    title: "The Keeper's Room",
+    tagline: "an endless vertical bounce. see just how high you can climb",
+    icon: "🪜",
+    accent: "#ff8fa3", // coral pink
+    url: "https://hootowlme.github.io/localAICodingTest2/",
+    desc: "Hop from platform to platform as the room stretches on forever. It only gets faster the higher you go, so hold tight, because falling down causes you to have to restart.",
+    howTo: ["← → / A D / mouse to steer", "you bounce automatically", "don't fall off the bottom"]
+  },
+  {
+    num: "02",
+    title: "Snakey",
+    tagline: "eat, grow long, and outlast everyone in the arena",
+    icon: "🐍",
+    accent: "#6fcf97", // snake green
+    url: "https://hootowlme.github.io/localAICodingTest1/",
+    desc: "Steer a hungry snake through a gridded arena. Gobble up orbs to grow longer, weave between other snakes, and get them to run into you.",
+    howTo: ["mouse / touch to steer, click to boost", "eat orbs to grow", "you can cross through yourself, but not others"]
+  },
+  {
+    num: "03",
+    title: "Fruit Frenzy",
+    tagline: "drop, match, & merge your way to a giant melon, then reach a high score",
+    icon: "🍉",
+    accent: "#ff8f6b", // fruity orange-red
+    url: "https://hootowlme.github.io/localAICodingTest3/",
+    desc: "Drop fruits into the tank and line up matching pairs so they merge into something bigger, like cherries, apples and oranges, all the way up to a giant watermelon. Just don't let the pile overflow!",
+    howTo: ["aim with your mouse", "drop fruits", "fruits of the same type merge"]
+  }
+  /* ➕ new game? add another { ... } object here and it appears automatically */
+];
+
+/* ============ render cards ============ */
+const list = document.getElementById("gameList");
+
+/* remember which cards are open between visits (keyed by game num, so reordering is safe) */
+const STATE_KEY = "game-room-open-cards";
+let savedState = {};
+try { savedState = JSON.parse(localStorage.getItem(STATE_KEY)) || {}; } catch (e) {}
+function saveState() {
+  try { localStorage.setItem(STATE_KEY, JSON.stringify(savedState)); } catch (e) {}
+}
+
+GAMES.forEach((g) => {
+  const open = savedState[g.num] !== undefined ? !!savedState[g.num] : true; // no memory yet? all open
+  const card = document.createElement("article");
+  card.className = "card" + (open ? " open" : "");
+  card.style.setProperty("--acc", g.accent);
+  card.innerHTML = `
+    <button class="card-head" aria-expanded="${open}" aria-controls="body-${g.num}">
+      <span class="card-num">${g.num}</span>
+      <span class="card-icon" aria-hidden="true">${g.icon}</span>
+      <span class="card-titles">
+        <span class="card-title">${g.title}</span>
+        <span class="card-tagline">${g.tagline}</span>
+      </span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div class="card-body" id="body-${g.num}">
+      <div class="card-inner">
+        <div class="card-content">
+          <p class="desc">${g.desc}</p>
+          <ul class="howto">${g.howTo.map(h => `<li>${h}</li>`).join("")}</ul>
+          <a class="play-btn" href="${g.url}" target="_blank" rel="noopener">Play now <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </div>`;
+
+  const head = card.querySelector(".card-head");
+  head.addEventListener("click", () => {
+    const nowOpen = card.classList.toggle("open");
+    head.setAttribute("aria-expanded", nowOpen);
+    savedState[g.num] = nowOpen;
+    saveState();
+  });
+
+  list.appendChild(card);
+});
+
+document.getElementById("gameCount").textContent = GAMES.length + (GAMES.length === 1 ? " game" : " games");
+
+/* ============ night mode (remembered) ============ */
+const NIGHT_KEY = "game-room-night";
+const toggle = document.getElementById("nightToggle");
+toggle.textContent = document.documentElement.classList.contains("night") ? "☀️" : "🌙"; // match the saved state applied in <head>
+toggle.addEventListener("click", () => {
+  const night = document.documentElement.classList.toggle("night");
+  toggle.textContent = night ? "☀️" : "🌙";
+  try { localStorage.setItem(NIGHT_KEY, night ? "1" : "0"); } catch (e) {}
+});
+
+/* ============ stars (night) ============ */
+const starsEl = document.getElementById("stars");
+for (let i = 0; i < 60; i++) {
+  const s = document.createElement("span");
+  s.className = "star";
+  const size = Math.random() * 2 + 1;
+  s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;top:${Math.random()*70}%;--d:${(Math.random()*2+1.5).toFixed(1)}s`;
+  starsEl.appendChild(s);
+}
+</script>
+</body>
+</html>
