@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cookie Clicker — Offline Clone</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ LEFT: the big cookie ============ -->
+  <section id="panel-left" aria-label="Cookie area">
+    <div id="counter-wrap">
+      <h1 id="cookie-count">0 cookies</h1>
+      <div id="cps-line">per second: <span id="cps-value">0</span></div>
+      <div id="click-power-line">per click: <span id="click-power-value">1</span></div>
+    </div>
+
+    <div id="buff-banner" class="hidden">
+      <span id="buff-name"></span>
+      <span class="bar"><i id="buff-bar"></i></span>
+    </div>
+
+    <!-- Milk pool + bobbing cookies (pure-CSS backdrop, see style.css) -->
+    <div id="milk" aria-hidden="true">
+      <i class="wave wave2"></i>
+      <i class="bubble b1"></i><i class="bubble b2"></i><i class="bubble b3"></i><i class="bubble b4"></i>
+      <i class="bubble b5"></i><i class="bubble b6"></i><i class="bubble b7"></i><i class="bubble b8"></i>
+      <i class="wave"></i>
+      <i class="floaty-cookie fc1"></i>
+      <i class="floaty-cookie fc2"></i>
+      <i class="floaty-cookie fc3"></i>
+      <i class="floaty-cookie fc4"></i>
+    </div>
+
+    <div id="cookie-zone">
+      <button id="big-cookie" type="button" aria-label="Bake a cookie!">
+        <span class="cookie-art" aria-hidden="true"></span>
+      </button>
+      <div id="clicker-army" aria-hidden="true"></div>
+      <div id="fx-layer" aria-hidden="true"></div>
+    </div>
+
+    <footer id="left-foot">offline clone &middot; progress auto-saves</footer>
+  </section>
+
+  <!-- Draggable divider: shrink the store to give the cookie more room -->
+  <div id="store-resizer" title="Drag to resize the store"></div>
+
+  <!-- ============ MIDDLE: news + store ============ -->
+  <section id="panel-mid" aria-label="Store">
+    <header id="news-bar"><span id="news-text">Fresh out of the oven…</span></header>
+
+    <nav id="tabs" role="tablist">
+      <button class="tab active" data-tab="buildings" type="button" role="tab">Buildings</button>
+      <button class="tab" data-tab="upgrades" type="button" role="tab">Upgrades<span id="upg-badge" class="badge hidden">0</span></button>
+      <button class="tab" data-tab="heaven" type="button" role="tab">Heaven<span id="chip-mini" class="chips-mini"></span></button>
+    </nav>
+
+    <div id="store-head">
+      <span id="store-title">Build your cookie empire</span>
+      <div id="buy-qty" aria-label="Buy quantity">
+        <button data-qty="1" class="qbtn active" type="button">x1</button>
+        <button data-qty="10" class="qbtn" type="button">x10</button>
+      </div>
+    </div>
+
+    <main id="store-scroll">
+      <ul id="building-list"></ul>
+      <div id="upgrade-grid" class="hidden"></div>
+
+      <section id="heaven-panel" class="hidden">
+        <div id="ascend-box">
+          <h3>Ascension</h3>
+          <p id="ascend-desc">Reset your run in exchange for heavenly chips. Each chip permanently boosts all cookie production by +2%. Achievements and the heavenly shop are kept.</p>
+          <p id="ascend-earn"></p>
+          <button id="btn-ascend" type="button" disabled>Ascend</button>
+        </div>
+        <h3>Heavenly shop</h3>
+        <ul id="h-upgrade-list"></ul>
+      </section>
+    </main>
+  </section>
+
+  <!-- ============ RIGHT: stats + achievements ============ -->
+  <aside id="panel-right" aria-label="Statistics">
+    <h2>Statistics</h2>
+    <dl id="stats-list"></dl>
+
+    <h2>Achievements <span id="ach-count" class="muted"></span></h2>
+    <ul id="achievement-list"></ul>
+
+    <div id="settings-row">
+      <button id="btn-save" type="button">Save now</button>
+      <button id="btn-reset" type="button" class="danger">Hard reset</button>
+    </div>
+  </aside>
+</div>
+
+<!-- Golden cookie (positioned fixed, spawned by JS) -->
+<button id="golden" type="button" class="hidden" aria-label="A golden cookie! Click it fast!"><i class="art golden-art" aria-hidden="true"></i></button>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="tooltip" class="hidden" role="tooltip"></div>
+
+<div id="modal" class="hidden">
+  <div id="modal-box">
+    <h3 id="modal-title"></h3>
+    <p id="modal-body"></p>
+    <button id="modal-ok" type="button">OK</button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/format.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
