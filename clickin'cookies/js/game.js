@@ -302,7 +302,13 @@
 
     if (S.goldenActive) {
       S.goldenActive.leftMs -= dt;
-      if (S.goldenActive.leftMs <= 0) S.goldenActive = null;
+      if (S.goldenActive.leftMs <= 0) {
+        S.goldenActive = null;
+        // Restart the spawn timer on natural expiry — otherwise the stale
+        // countdown (already ≤ 0 from the previous spawn) respawns a new
+        // golden cookie on the very next tick.
+        S.nextGoldenIn = gcIntervalMs();
+      }
     } else {
       S.nextGoldenIn -= dt;
       if (S.nextGoldenIn <= 0) spawnGolden();

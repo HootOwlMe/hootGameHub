@@ -407,7 +407,9 @@
       g.classList.remove('hidden');
     } else if (!S.goldenActive && lastGoldenRef) {
       lastGoldenRef = null;
-      g.classList.add('hidden');
+      // Fade out before hiding so the cookie dissolves instead of popping away.
+      g.classList.add('golden-fade');
+      setTimeout(function () { g.classList.remove('golden-fade'); g.classList.add('hidden'); }, 500);
     }
 
     drainToastsReal();
@@ -590,6 +592,9 @@
 
   /* ---------------- events -------------------------------------------------- */
   function bindEvents() {
+    // Set true during a hard reset so the unload autosave doesn't re-write
+    // the save we just erased (location.reload() fires beforeunload).
+    let hardResetting = false;
     const cookieBtn = $('big-cookie');
     cookieBtn.addEventListener('click', function (e) {
       const gain = CC.click();
@@ -638,6 +643,7 @@
     $('btn-reset').addEventListener('click', function () {
       if (!confirm('HARD RESET: erase ALL progress, including heavenly chips and achievements?')) return;
       if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
+      hardResetting = true; // stop beforeunload from re-saving the wiped state
       try { window.localStorage.removeItem(CC.SAVE_KEY); } catch (e) {}
       location.reload();
     });
@@ -646,8 +652,8 @@
     $('modal').addEventListener('click', function (e) { if (e.target === this) hideModal(); });
 
     // Autosave
-    window.addEventListener('beforeunload', function () { CC.save(); });
-    document.addEventListener('visibilitychange', function () { if (document.hidden) CC.save(); });
+    window.addEventListener('beforeunload', function () { if (!hardResetting) CC.save(); });
+    document.addEventListener('visibilitychange', function () { if (!hardResetting && document.hidden) CC.save(); });
   }
 
   /* ---------------- init ------------------------------------------------------ */

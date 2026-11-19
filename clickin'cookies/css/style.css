@@ -226,13 +226,19 @@ body.resizing { cursor: col-resize; user-select: none; }
    neat circumference, one revolution per minute. Each arrow's tip points at
    the cookie (225° base turn in the rotating frame), and their pokes fire in
    sequence so a wave rolls clockwise around the ring. */
-#clicker-army { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+#clicker-army {
+  position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  /* ONE shared spin for the whole ring: every cursor stays exactly
+     --ang apart from its neighbours no matter when it was purchased.
+     (Per-cursor animations each started their own clock, so cursors
+      bought at different times drifted out of formation until a reload.) */
+  animation: army-spin 60s linear infinite;
+}
+@keyframes army-spin { to { transform: rotate(360deg); } }
 .army-orbit {
   position: absolute; left: 50%; top: 50%; width: 0; height: 0;
   rotate: var(--ang, 0deg);
-  animation: orbit-spin 60s linear infinite;
 }
-@keyframes orbit-spin { to { rotate: calc(var(--ang, 0deg) + 360deg); } }
 .poke-wrap {
   position: absolute; left: 0; top: 0; width: 0; height: 0;
   /* In the orbit frame +Y always points at the cookie center, so this
@@ -293,6 +299,12 @@ body.resizing { cursor: col-resize; user-select: none; }
   0%, 100% { transform: scale(1) rotate(-3deg); }
   50%      { transform: scale(1.08) rotate(3deg); }
 }
+/* Dissolve-out when the cookie expires (gpulse keeps moving, gfade owns opacity). */
+#golden.golden-fade {
+  animation: gpulse 1s ease-in-out infinite, gfade .45s ease forwards;
+  pointer-events: none;
+}
+@keyframes gfade { to { opacity: 0; } }
 
 /* --- PLACEHOLDER SPRITE: golden cookie (replace .golden-art) ---------- */
 .golden-art {
