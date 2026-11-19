@@ -1,0 +1,262 @@
+/* ============ Suika Game — styles ============ */
+
+:root {
+  /* soft light theme — warm cream base, pastel washes */
+  --bg-0: #f6eedd;
+  --bg-1: #efe3cd;
+  --panel: rgba(255, 255, 255, 0.62);
+  --panel-border: rgba(176, 141, 116, 0.28);
+  --text: #4d4037;
+  --text-dim: #a08d7c;
+  --accent: #ff6b8a;
+  --gold: #e8a200;
+  --green: #3fa95f;
+  --radius-lg: 24px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(1100px 700px at 85% -10%, rgba(167, 203, 255, 0.4), transparent 60%),
+    radial-gradient(950px 750px at -10% 110%, rgba(255, 183, 197, 0.45), transparent 55%),
+    radial-gradient(800px 600px at 110% 90%, rgba(178, 226, 195, 0.38), transparent 55%),
+    linear-gradient(160deg, var(--bg-1) 0%, var(--bg-0) 60%);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  width: min(94vw, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 0 18px;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hud-left { display: flex; gap: 8px; }
+
+.next-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 5px 9px 3px;
+}
+.next-label { font-size: 8.5px; letter-spacing: 0.12em; margin-bottom: 0; }
+#nextCanvas { width: 40px; height: 40px; display: block; }
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease;
+  backdrop-filter: blur(6px);
+}
+.icon-btn:hover { background: rgba(255, 236, 224, 0.95); }
+.icon-btn:active { transform: scale(0.94); }
+
+.score-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 7px 14px;
+}
+
+.score-block { display: flex; flex-direction: column; line-height: 1.05; }
+
+.score-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.score-value {
+  font-family: "Baloo 2", "Nunito", sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.best-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 12px;
+  border-left: 1px solid var(--panel-border);
+}
+.best-badge svg { opacity: 0.95; }
+.best-text { display: flex; flex-direction: column; line-height: 1.05; text-align: right; }
+.best-value { color: var(--gold); }
+
+/* ---------- Stage ---------- */
+#stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 420 / 640;
+}
+
+#game {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 30px 60px -20px rgba(173, 134, 100, 0.38),
+    0 0 0 1px rgba(176, 141, 116, 0.22);
+  touch-action: none;
+  cursor: grab;
+}
+#game.dragging { cursor: grabbing; }
+
+/* ---------- Overlays ---------- */
+.overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 250, 244, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+.overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.overlay-card {
+  width: min(84%, 340px);
+  background: linear-gradient(170deg, rgba(255, 255, 255, 0.98), rgba(253, 243, 231, 0.98));
+  border: 1px solid rgba(176, 141, 116, 0.3);
+  border-radius: 22px;
+  padding: 30px 26px 26px;
+  text-align: center;
+  box-shadow: 0 24px 50px -18px rgba(150, 110, 80, 0.35);
+}
+
+.overlay-card h1 {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 34px;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+
+.overlay-sub { color: var(--text-dim); font-weight: 700; margin-bottom: 18px; }
+
+.overlay-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 22px;
+}
+
+.big-value {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 54px;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(90deg, #ffd76a, #ff9d6b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.primary-btn {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6b8a, #ff8e5e);
+  border: none;
+  border-radius: 999px;
+  padding: 12px 42px;
+  cursor: pointer;
+  box-shadow: 0 12px 24px -10px rgba(255, 107, 138, 0.65);
+  transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.primary-btn:hover { filter: brightness(1.07); }
+.primary-btn:active { transform: scale(0.96); }
+
+.big-start { font-size: 24px; padding: 13px 64px; }
+
+/* ---------- Splash ---------- */
+.splash-card h1.title-logo {
+  font-size: 58px;
+  line-height: 1;
+  background: linear-gradient(90deg, #ff8fab, #ffc37b 45%, #a8c6f0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.logo-dot { color: var(--accent); -webkit-text-fill-color: var(--accent); }
+
+.tagline { color: var(--text-dim); font-weight: 700; margin: 12px 0 24px; line-height: 1.55; }
+
+.hint {
+  margin-top: 18px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
+/* ---------- Footer ---------- */
+.foot {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+/* ---------- Small screens / short viewports ---------- */
+@media (max-height: 760px) {
+  #app { gap: 8px; padding-bottom: 10px; }
+  .score-value { font-size: 22px; }
+  .icon-btn { width: 38px; height: 38px; border-radius: 12px; }
+}

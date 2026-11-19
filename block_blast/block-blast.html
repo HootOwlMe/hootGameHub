@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Block Blast 9×9</title>
+<style>
+  :root{
+    --cs: 46px;            /* cell size, set by JS */
+    --panel: #1c2340;
+    --bg1: #0d1226;
+    --bg2: #171f3d;
+    --text: #eef1ff;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
+  html,body{ height:100%; }
+  body{
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    background: radial-gradient(1200px 800px at 70% -10%, #232c5c 0%, var(--bg2) 45%, var(--bg1) 100%) fixed;
+    color: var(--text);
+    overflow-x: hidden;
+    min-height: 100%;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding: 14px 20px 6px;
+    max-width: 980px; margin: 0 auto;
+  }
+  h1{
+    font-size: clamp(20px, 3.4vw, 30px);
+    letter-spacing: 2px; font-weight: 800;
+    background: linear-gradient(90deg,#7dd3fc,#c084fc,#f472b6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    white-space: nowrap;
+  }
+  h1 small{ font-size:.55em; letter-spacing:4px; opacity:.85; }
+  .hud{ display:flex; gap:10px; align-items:center; }
+  .scorebox{
+    background: var(--panel); border-radius: 12px; padding: 6px 14px; text-align:center;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 4px 14px rgba(0,0,0,.35);
+    min-width: 86px;
+  }
+  .scorebox .label{ font-size:10px; letter-spacing:2px; opacity:.6; text-transform:uppercase; }
+  .scorebox .value{ font-size:20px; font-weight:800; font-variant-numeric: tabular-nums; }
+  #bestVal{ color:#fbbf24; }
+  button.hudbtn{
+    background: var(--panel); color:var(--text); border:none; cursor:pointer;
+    border-radius:12px; padding: 10px 14px; font-size:15px; font-weight:600;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 4px 14px rgba(0,0,0,.35);
+    transition: transform .08s ease, filter .15s;
+  }
+  button.hudbtn:hover{ filter:brightness(1.2); }
+  button.hudbtn:active{ transform: scale(.94); }
+
+  /* ---------- Theme picker ---------- */
+  header{ position:relative; }
+  .thememenu{
+    position:absolute; top:calc(100% + 8px); right:0; z-index:70;
+    width:236px; padding:8px; display:flex; flex-direction:column; gap:4px;
+    background:rgba(15,19,40,.97); border:1px solid rgba(255,255,255,.14);
+    border-radius:14px; box-shadow:0 18px 44px rgba(0,0,0,.6); backdrop-filter:blur(8px);
+  }
+  .thememenu.hidden{ display:none; }
+  .therow{
+    display:flex; align-items:center; gap:10px; padding:8px 10px;
+    border-radius:10px; cursor:pointer; color:#e5ecff; font-weight:600; font-size:14px;
+  }
+  .therow:hover{ background:rgba(255,255,255,.08); }
+  .therow.active{ background:rgba(139,92,246,.22); box-shadow:inset 0 0 0 1px rgba(139,92,246,.65); }
+  .therow .tick{ margin-left:auto; opacity:.9; }
+  .swatches{ display:flex; gap:3px; flex:none; }
+  .swatches i{ width:12px; height:12px; border-radius:3px; box-shadow:inset 0 -2px 0 rgba(0,0,0,.35); }
+
+  /* ---------- Layout ---------- */
+  main{
+    display:flex; gap: 22px; align-items:center; justify-content:center;
+    max-width: 980px; margin: 0 auto; padding: 10px 16px 24px;
+  }
+
+  /* ---------- Board ---------- */
+  #boardWrap{ position:relative; }
+  #board{
+    display:grid; grid-template-columns: repeat(9, var(--cs)); gap: 5px;
+    background: var(--boardBg, linear-gradient(180deg,#252e57,#1b2244));
+    padding: 14px; border-radius: 18px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 18px 50px rgba(0,0,0,.5);
+    touch-action: none;
+  }
+  .cell{
+    width: var(--cs); height: var(--cs); border-radius: 7px;
+    background: var(--cd,#1f2950);   /* flat per-section tint (no inner checkerboard) */
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.35), inset 0 -1px 0 rgba(255,255,255,.04);
+    transition: background .1s;
+  }
+  /* per-3x3-section tints: alternating (theme-driven via --secA / --secB) */
+  .s0,.s2,.s4,.s6,.s8{ --cd:var(--secA,#274f41); }
+  .s1,.s3,.s5,.s7    { --cd:var(--secB,#40274f); }
+  .cell.filled{
+    background-image: var(--blockTex, none);   // per-theme block texture (board stays flat)
+    box-shadow:
+      inset 0 3px 0 rgba(255,255,255,.30),
+      inset 0 -4px 0 rgba(0,0,0,.30),
+      inset 2px 0 0 rgba(255,255,255,.10),
+      0 2px 6px rgba(0,0,0,.35);
+  }
+  .cell.pop{ animation: pop .18s ease-out; }
+  @keyframes pop{ 0%{ transform:scale(.55);} 70%{ transform:scale(1.08);} 100%{ transform:scale(1);} }
+
+  .cell.ghost-ok{
+    background: rgba(124,252,152,.30) !important;
+    box-shadow: inset 0 0 0 3px rgba(124,252,152,.8), inset 0 2px 6px rgba(0,0,0,.2);
+  }
+  .cell.ghost-bad{
+    background: rgba(255,90,90,.30) !important;
+    box-shadow: inset 0 0 0 3px rgba(255,110,110,.7), inset 0 2px 6px rgba(0,0,0,.2);
+  }
+  .cell.ghost-mid{
+    background: rgba(255,255,255,.14) !important;
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.38), inset 0 2px 6px rgba(0,0,0,.2);
+  }
+  .cell.ghost-clear{
+    background: #facc15 !important;
+    box-shadow: inset 0 0 0 3px #fef08a, 0 0 16px rgba(250,204,21,.6);
+  }
+  .cell.boom{ animation: boom .4s ease-in forwards; z-index:2; }
+  @keyframes boom{
+    0%  { transform:scale(1);   filter:brightness(1.6); opacity:1; }
+    55% { transform:scale(1.18);filter:brightness(2.2); opacity:.9; }
+    100%{ transform:scale(.1);  filter:brightness(2.4); opacity:0; }
+  }
+
+  .floatscore{
+    position:absolute; left:50%; top:38%; transform:translate(-50%,-50%);
+    font-size: clamp(26px, 5vw, 44px); font-weight:900; pointer-events:none; z-index:5;
+    color:#fff; text-shadow: 0 0 18px rgba(124,252,152,.9), 0 3px 6px rgba(0,0,0,.6);
+    animation: floatup .95s ease-out forwards; white-space:nowrap; text-align:center;
+  }
+  .floatscore small{ display:block; font-size:.42em; letter-spacing:3px; color:#fbbf24; }
+  @keyframes floatup{
+    0%{ transform:translate(-50%,-50%) scale(.6); opacity:0; }
+    18%{ transform:translate(-50%,-60%) scale(1.12); opacity:1; }
+    100%{ transform:translate(-50%,-190%) scale(1); opacity:0; }
+  }
+
+  .hint{ text-align:center; font-size:12px; opacity:.45; margin-top:10px; letter-spacing:.5px; }
+
+  /* ---------- Side tray ---------- */
+  #tray{
+    width: clamp(130px, 22vw, 200px);
+    display:flex; flex-direction:column; gap: 14px;
+  }
+  #tray h2{
+    font-size:11px; letter-spacing:3px; text-transform:uppercase; opacity:.55;
+    text-align:center; margin-bottom:-4px;
+  }
+  .slot{
+    background: var(--panel); border-radius: 16px; min-height: 96px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 8px 22px rgba(0,0,0,.35);
+    transition: filter .15s;
+  }
+  .slot.used{ opacity:.35; box-shadow: inset 0 0 0 1px dashed rgba(255,255,255,.12); }
+  .piece{ cursor:grab; touch-action:none; display:grid; gap:3px; padding:6px; border-radius:8px; transition: transform .1s ease, filter .15s; }
+  .piece:hover{ transform: scale(1.07); filter:brightness(1.15); }
+  .piece.unplaceable{ opacity:.45; filter:grayscale(.85) brightness(.72); }   /* can't fit anywhere right now — still grabbable */
+  .piece.dragging{ opacity:.25; cursor:grabbing; }
+  .pcell{ border-radius:4px; background-image: var(--blockTex, none); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), inset 0 -2px 0 rgba(0,0,0,.3); }
+
+  /* ---------- Floating drag clone ---------- */
+  #dragLayer{ position:fixed; inset:0; pointer-events:none; z-index:50; }
+  .dragPiece{ position:absolute; will-change:left,top; filter: drop-shadow(0 12px 18px rgba(0,0,0,.5)); transition: opacity .1s; }
+  .dragPiece.dimmed{ opacity:.45; }
+  .dcell{ position:absolute; border-radius:7px; background-image: var(--blockTex, none); box-shadow: inset 0 3px 0 rgba(255,255,255,.3), inset 0 -4px 0 rgba(0,0,0,.3); }
+  .dragPiece.invalid .dcell{
+    background: rgba(255,77,79,.8) !important;
+    box-shadow: inset 0 0 0 3px rgba(255,143,143,.95), inset 0 3px 0 rgba(255,255,255,.2);
+  }
+
+  /* ---------- Game over overlay ---------- */
+  #overlay{
+    position:fixed; inset:0; background:rgba(7,10,24,.78); backdrop-filter: blur(6px);
+    display:flex; align-items:center; justify-content:center; z-index:100;
+    opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  #overlay.show{ opacity:1; pointer-events:auto; }
+  .card{
+    background: linear-gradient(180deg,#242d5a,#1a2142);
+    border-radius: 22px; padding: 36px 44px; text-align:center;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 30px 80px rgba(0,0,0,.6);
+    transform: translateY(14px) scale(.96); transition: transform .3s;
+  }
+  #overlay.show .card{ transform: translateY(0) scale(1); }
+  .card h2{ font-size:30px; letter-spacing:2px; margin-bottom:8px;
+    background: linear-gradient(90deg,#f472b6,#c084fc); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .card p{ opacity:.85; margin: 6px 0; font-size:15px; }
+  .card .final{ font-size:42px; font-weight:900; color:#fff; text-shadow:0 0 24px rgba(192,132,252,.7); }
+  #newBestTag{ display:none; color:#fbbf24; font-weight:800; letter-spacing:2px; font-size:13px; margin-top:4px; }
+  .card button{
+    margin-top:22px; padding: 13px 34px; font-size:17px; font-weight:800; letter-spacing:1px;
+    border:none; border-radius: 14px; cursor:pointer; color:#fff;
+    background: linear-gradient(90deg,#7c3aed,#db2777);
+    box-shadow: 0 10px 26px rgba(168,55,255,.4), inset 0 1px 0 rgba(255,255,255,.35);
+    transition: transform .1s, filter .15s;
+  }
+  .card button:hover{ filter:brightness(1.15); }
+  .card button:active{ transform:scale(.95); }
+
+  /* ---------- Mobile portrait ---------- */
+  @media (max-width: 640px){
+    main{ flex-direction:column; gap:14px; padding-top:4px; }
+    #tray{ flex-direction:row; width:auto; justify-content:center; order:2; }
+    #tray h2{ display:none; }
+    .slot{ min-height: 84px; width: clamp(90px, 26vw, 130px); }
+    header{ padding-top:10px; }
+    .scorebox{ min-width:70px; padding:5px 10px; }
+    .scorebox .value{ font-size:17px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BLOCK BLAST <small>9×9</small></h1>
+  <div class="hud">
+    <div class="scorebox"><div class="label">Score</div><div class="value" id="scoreVal">0</div></div>
+    <div class="scorebox"><div class="label">Best</div><div class="value" id="bestVal">0</div></div>
+    <button class="hudbtn" id="themeBtn" title="Themes">🎨 Themes</button>
+    <button class="hudbtn" id="muteBtn" title="Toggle sound">🔊</button>
+    <button class="hudbtn" id="newGameBtn" title="Restart">↻ New</button>
+  </div>
+  <div id="themeMenu" class="thememenu hidden"></div>
+</header>
+
+<main>
+  <section id="boardWrap">
+    <div id="board"></div>
+    <div class="hint"></div>
+  </section>
+  <aside id="tray">
+    <h2>Your Blocks</h2>
+    <div class="slot" id="slot0"></div>
+    <div class="slot" id="slot1"></div>
+    <div class="slot" id="slot2"></div>
+  </aside>
+</main>
+
+<div id="dragLayer"><div class="dragPiece" id="dragPiece" style="display:none"></div></div>
+
+<div id="overlay">
+  <div class="card">
+    <h2>GAME OVER</h2>
+    <p>No room for any block left.</p>
+    <div class="final" id="finalScore">0</div>
+    <div id="newBestTag">★ NEW BEST ★</div>
+    <p id="finalBest"></p>
+    <button id="againBtn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   BLOCK BLAST 9×9
+   - 9x9 board with a large checkerboard pattern
+   - Tray of 3 pieces on the side; drag & drop onto open cells
+   - Full rows/columns blast clear; combo scoring; best in localStorage
+   Shape pool (rotations + mirrors generated & deduped at load):
+     * domino            -> 2-block, both orientations ("2-tall block")
+     * lines 3 / 4 / 5   -> horizontal & vertical
+     * 2x2 square
+     * corner (small L)  -> all 4 rotations
+     * big L (3-long leg)-> all 8 rotations/mirrors (L + J)
+     * T tetromino       == "+" without the left arm / without the right arm
+                            (its rotations), so both requested shapes included
+     * full plus cross   -> the "+" shape block
+     * S/Z snakes        -> all 4 orientations ("rest from the main game")
+     * 3-diagonal        -> both diagonal directions
+   ===================================================================== */
+
+const SIZE = 9;
+const GAP = 5, PAD = 14;   // must mirror #board CSS values (px)
+
+/* ---------------- Shape generation ---------------- */
+function norm(cells){
+  let mx=Infinity, my=Infinity;
+  for(const [x,y] of cells){ if(x<mx)mx=x; if(y<my)my=y; }
+  return cells.map(([x,y])=>[x-mx,y-my]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+}
+function keyOf(cells){ return norm(cells).map(c=>c.join(",")).join(";"); }
+function rotCW(cells){ const h=Math.max(...cells.map(c=>c[1]))+1; return cells.map(([x,y])=>[h-1-y,x]); }
+function mirX (cells){ const w=Math.max(...cells.map(c=>c[0]))+1; return cells.map(([x,y])=>[w-1-x,y]); }
+
+// all unique orientations of a base shape under rotation + mirror
+function orientations(base){
+  const seen=new Set(), out=[], stack=[norm(base)];
+  while(stack.length){
+    const c=stack.pop(); const k=keyOf(c);
+    if(seen.has(k)) continue;
+    seen.add(k); out.push(c);
+    stack.push(norm(rotCW(c)), norm(mirX(c)));
+  }
+  return out;
+}
+
+const BASES = [
+  { name:"single",  cells:[[0,0]],                                      color:"#94a3b8" }, // 1x1 block
+  { name:"domino",  cells:[[0,0],[1,0]],                                color:"#38bdf8" }, // 2-block (2-tall via rotation)
+  { name:"line3",   cells:[[0,0],[1,0],[2,0]],                          color:"#2dd4bf" },
+  { name:"line4",   cells:[[0,0],[1,0],[2,0],[3,0]],                    color:"#60a5fa" },
+  { name:"line5",   cells:[[0,0],[1,0],[2,0],[3,0],[4,0]],              color:"#818cf8" },
+  { name:"square2", cells:[[0,0],[1,0],[0,1],[1,1]],                    color:"#e879f9" }, // 2x2 square
+  { name:"corner",  cells:[[0,0],[1,0],[1,1]],                          color:"#fb923c" }, // small L, all mirrors/rots
+  { name:"bigL",    cells:[[0,0],[1,0],[2,0],[2,1]],                    color:"#f87171" }, // 3-long L block + all mirrored (J)
+  { name:"T",       cells:[[0,0],[1,0],[2,0],[1,1]],                    color:"#4ade80" }, // "+" w/o left arm & w/o right arm (+ rotations)
+  { name:"tallT",   cells:[[0,0],[1,0],[2,0],[1,1],[1,2]],              color:"#34d399" }, // taller T (5-cell) + all rotations
+  { name:"plus",    cells:[[1,0],[0,1],[1,1],[2,1],[1,2]],              color:"#facc15" }, // full "+" cross
+  { name:"snake",   cells:[[0,0],[1,0],[1,1],[2,1]],                    color:"#a3e635" }, // S / Z (mirrors)
+  { name:"diag3",   cells:[[0,0],[1,1],[2,2]],                          color:"#f472b6" }  // 3-diagonal + mirrored
+];
+
+const POOL = BASES.flatMap(b => orientations(b.cells).map(c=>({
+  cells:c, w:Math.max(...c.map(p=>p[0]))+1, h:Math.max(...c.map(p=>p[1]))+1, color:b.color, fam:b.name
+})));
+// (families are picked uniformly, then a random orientation within the family)
+const FAMILIES = BASES.map(b => orientations(b.cells).map(c=>({
+  cells:c, w:Math.max(...c.map(p=>p[0]))+1, h:Math.max(...c.map(p=>p[1]))+1, color:b.color, fam:b.name
+})));
+
+/* ---------------- Themes ---------------- */
+const THEMES = {
+  neon:{ label:"Neon", secA:"#232a45", secB:"#262e4a", boardBg:"linear-gradient(180deg,#1a2036,#121729)",
+    tex:"radial-gradient(circle at 32% 28%, rgba(255,255,255,.4), transparent 55%)",
+    colors:{ single:"#94a3b8", domino:"#38bdf8", line3:"#2dd4bf", line4:"#60a5fa", line5:"#818cf8", square2:"#e879f9", corner:"#fb923c", bigL:"#f87171", T:"#4ade80", tallT:"#34d399", plus:"#facc15", snake:"#a3e635", diag3:"#f472b6" } },
+  wood:{ label:"Wood", secA:"#3a2b1d", secB:"#352819", boardBg:"linear-gradient(180deg,#2b1f14,#1c140b)",
+    tex:"repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 2px, transparent 2px 6px), repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 1px, transparent 1px 9px)",
+    colors:{ single:"#e8d5ae", domino:"#a5673f", line3:"#f2b866", line4:"#7d4e24", line5:"#d98e4a", square2:"#cfae7f", corner:"#c05f1d", bigL:"#9a4a2c", T:"#b0793f", tallT:"#8f7d64", plus:"#f5e7cc", snake:"#b3a28c", diag3:"#b97a57" } },
+  digital:{ label:"Digital", secA:"#0d1526", secB:"#101829", boardBg:"linear-gradient(180deg,#070d18,#04070e)",
+    tex:"repeating-linear-gradient(0deg, rgba(255,255,255,.14) 0 1px, transparent 1px 4px), radial-gradient(circle at 30% 25%, rgba(255,255,255,.28), transparent 55%)",
+    colors:{ single:"#cfd8dc", domino:"#00e5ff", line3:"#2979ff", line4:"#00bfa5", line5:"#d500f9", square2:"#40c4ff", corner:"#ff9100", bigL:"#76ff03", T:"#64ffda", tallT:"#8c9eff", plus:"#f5f5f5", snake:"#ff1744", diag3:"#ea80fc" } },
+  fruit:{ label:"Fruit", secA:"#3f3630", secB:"#3a322c", boardBg:"linear-gradient(180deg,#2b2420,#1c1714)",
+    tex:"radial-gradient(circle at 30% 26%, rgba(255,255,255,.55), transparent 48%)",
+    colors:{ single:"#ffd93d", domino:"#ff5c7a", line3:"#8ac926", line4:"#54a0ff", line5:"#9b5de5", square2:"#ff9f43", corner:"#06d6a0", bigL:"#ef476f", T:"#f15bb5", tallT:"#2ec4b6", plus:"#fff3b0", snake:"#e562ab", diag3:"#c77dff" } },
+  ocean:{ label:"Ocean", secA:"#123049", secB:"#10334a", boardBg:"linear-gradient(180deg,#0b2033,#071421)",
+    tex:"repeating-linear-gradient(115deg, rgba(255,255,255,.10) 0 3px, transparent 3px 10px)",
+    colors:{ single:"#dff3ff", domino:"#4cc9f0", line3:"#a3be8c", line4:"#1d4ed8", line5:"#5a189a", square2:"#0ea5e9", corner:"#ffd166", bigL:"#ff7b54", T:"#3ddc97", tallT:"#00b4d8", plus:"#fdf0e7", snake:"#40916c", diag3:"#2ec4b6" } },
+  candy:{ label:"Candy", secA:"#38363d", secB:"#343239", boardBg:"linear-gradient(180deg,#262429,#1a191e)",
+    tex:"radial-gradient(circle at 22% 30%, rgba(255,255,255,.6) 0 2px, transparent 3px), radial-gradient(circle at 72% 62%, rgba(255,255,255,.45) 0 2px, transparent 3px), radial-gradient(circle at 48% 82%, rgba(255,255,255,.4) 0 1.5px, transparent 2.5px)",
+    colors:{ single:"#ffd166", domino:"#ef476f", line3:"#06d6a0", line4:"#4cc9f0", line5:"#9d4edd", square2:"#ff9f1c", corner:"#f72585", bigL:"#8b5e3c", T:"#e63946", tallT:"#70d6ff", plus:"#ffffff", snake:"#c2f43d", diag3:"#7b2cbf" } },
+  forest:{ label:"Forest", secA:"#2e2b20", secB:"#322d24", boardBg:"linear-gradient(180deg,#1f1d16,#14120d)",
+    tex:"repeating-linear-gradient(45deg, rgba(0,0,0,.14) 0 2px, transparent 2px 7px), radial-gradient(circle at 30% 28%, rgba(255,255,255,.16), transparent 55%)",
+    colors:{ single:"#f0ecc9", domino:"#8ac926", line3:"#a3b18a", line4:"#588157", line5:"#606c38", square2:"#dda15e", corner:"#bc6c25", bigL:"#8b6f47", T:"#7fb069", tallT:"#3a7d44", plus:"#fffbe8", snake:"#c9ada7", diag3:"#d9b45b" } },
+  sunset:{ label:"Sunset", secA:"#3d2438", secB:"#372440", boardBg:"linear-gradient(180deg,#251631,#170d20)",
+    tex:"linear-gradient(180deg, rgba(255,255,255,.28), rgba(0,0,0,.16))",
+    colors:{ single:"#ffe8d6", domino:"#ff6b35", line3:"#f9c80e", line4:"#ff2e63", line5:"#7209b7", square2:"#ffd166", corner:"#d90429", bigL:"#c77dff", T:"#fb8500", tallT:"#9d4edd", plus:"#ffffff", snake:"#ff70a6", diag3:"#3d348b" } },
+  slate:{ label:"Slate", secA:"#23272e", secB:"#262b32", boardBg:"linear-gradient(180deg,#1a1e24,#111419)",
+    tex:"repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 1px, transparent 1px 3px), radial-gradient(circle at 32% 28%, rgba(255,255,255,.2), transparent 55%)",
+    colors:{ single:"#f1f4f7", domino:"#d3dae1", line3:"#b5bec7", line4:"#97a2ad", line5:"#e2e8ed", square2:"#c4ccd4", corner:"#a6b0ba", bigL:"#5b6774", T:"#8893a0", tallT:"#6a7683", plus:"#ffffff", snake:"#798591", diag3:"#5f6b79" } }
+};
+let curTheme = localStorage.getItem("bb9_theme")||"neon";
+if(!THEMES[curTheme]) curTheme="neon";
+function themeColor(fam){ const t=THEMES[curTheme]; return (t.colors&&t.colors[fam])||"#9aa3b2"; }
+function applyTheme(key, persist=true){
+  if(!THEMES[key]) return;
+  curTheme=key;
+  const t=THEMES[key], rs=document.documentElement.style;
+  rs.setProperty("--secA",t.secA); rs.setProperty("--secB",t.secB); rs.setProperty("--boardBg",t.boardBg);
+  rs.setProperty("--blockTex",t.tex||"none");
+  for(let i=0;i<cells.length;i++) if(board[i]) paintCell(i);   // re-color already-placed blocks
+  renderTray();
+  buildThemeMenu();
+  if(persist) localStorage.setItem("bb9_theme",key);
+}
+function buildThemeMenu(){
+  const m=$("themeMenu"); if(!m) return;
+  m.innerHTML="";
+  for(const [key,t] of Object.entries(THEMES)){
+    const row=document.createElement("div");
+    row.className="therow"+(key===curTheme?" active":"");
+    let sw='<span class="swatches">';
+    [t.secA,t.secB,t.colors.domino,t.colors.T,t.colors.plus].forEach(c=>{ sw+='<i style="background:'+c+'"></i>'; });
+    row.innerHTML=sw+'</span><span>'+t.label+'</span>'+(key===curTheme?'<span class="tick">✓</span>':'');
+    row.addEventListener("click",()=>{ applyTheme(key); m.classList.add("hidden"); });
+    m.appendChild(row);
+  }
+}
+
+function randomPiece(){
+  const fam = FAMILIES[(Math.random()*FAMILIES.length)|0];
+  return { ...(fam[(Math.random()*fam.length)|0] ) };
+}
+void POOL; // kept for reference / debugging
+
+/* ---------------- State ---------------- */
+let board, cells=[];          // board[i]: null | color ; cells: DOM elements row-major
+let tray = [null,null,null];  // pieces in the side slots
+let score=0, combo=0, over=false;
+let best = +(localStorage.getItem("bb9_best")||0);
+let muted = localStorage.getItem("bb9_muted")==="1";
+
+const $ = id => document.getElementById(id);
+const boardEl=$("board"), dragPieceEl=$("dragPiece");
+
+/* ---------------- Board DOM (nine 3x3 blocks) ---------------- */
+function buildBoard(){
+  boardEl.innerHTML=""; cells=[];
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    const el=document.createElement("div");
+    el.className="cell s"+(Math.floor(r/3)*3+Math.floor(c/3));   // flat per-section tint
+    boardEl.appendChild(el); cells.push(el);
+  }
+}
+function paintCell(i, animate){
+  const el=cells[i], v=board[i];
+  if(el.classList.contains("boom")) el.classList.remove("boom");
+  if(v){ el.style.backgroundColor=themeColor(v); el.classList.add("filled"); if(animate) el.classList.add("pop"); }
+  else { el.style.background=""; el.classList.remove("filled","pop"); }
+}
+
+/* ---------------- Layout / cell size ---------------- */
+function layout(){
+  const trayW = window.innerWidth>640 ? Math.min(Math.max(window.innerWidth*0.22,130),200)+42 : 0;
+  const availW = window.innerWidth - trayW - 60;
+  const availH = window.innerHeight - (window.innerWidth>640?150:320);
+  let size = Math.min(availW, availH, 620);
+  // board width = 9*cs + 8*GAP + 2*PAD
+  const cs = Math.max(20, Math.floor((size - (8*GAP + 2*PAD)) / 9));
+  document.documentElement.style.setProperty("--cs", cs+"px");
+}
+
+/* ---------------- Grid helpers ---------------- */
+function inBounds(col,row,w,h){ return col>=0 && row>=0 && col+w<=SIZE && row+h<=SIZE; }
+function canPlaceAt(piece,col,row){
+  if(!inBounds(col,row,piece.w,piece.h)) return false;
+  for(const [x,y] of piece.cells) if(board[(row+y)*SIZE + (col+x)]) return false;
+  return true;
+}
+function canFitAnywhere(piece){
+  for(let r=0;r<=SIZE-piece.h;r++)
+    for(let c=0;c<=SIZE-piece.w;c++)
+      if(canPlaceAt(piece,c,r)) return true;
+  return false;
+}
+
+// pixel positions of each column/row (accounts for the bigger gaps between 3x3 blocks)
+function gridPositions(){
+  const xs=new Array(SIZE), ys=new Array(SIZE);
+  for(let c=0;c<SIZE;c++) xs[c]=cells[c].getBoundingClientRect().left;
+  for(let r=0;r<SIZE;r++) ys[r]=cells[r*SIZE].getBoundingClientRect().top;
+  return {xs,ys};
+}
+function nearest(pos, target){
+  let bi=0,bd=Infinity;
+  for(let i=0;i<pos.length;i++){ const d=Math.abs(pos[i]-target); if(d<bd){bd=d;bi=i;} }
+  return {i:bi,d:bd};
+}
+
+/* ---------------- Tray rendering ---------------- */
+function renderTray(){
+  for(let i=0;i<3;i++){
+    const slot=$("slot"+i), p=tray[i];
+    slot.innerHTML="";
+    slot.classList.toggle("used", !p);
+    if(!p) continue;
+    const el=document.createElement("div");
+    el.className="piece"+(canFitAnywhere(p)?"":" unplaceable");
+    const cs=Math.max(10, Math.min(24, Math.floor((slot.clientWidth-30)/Math.max(p.w,p.h))));
+    el.style.gridTemplateColumns=`repeat(${p.w},${cs}px)`;
+    el.style.gridAutoRows=cs+"px";
+    for(let y=0;y<p.h;y++)for(let x=0;x<p.w;x++){
+      const d=document.createElement("div");
+      if(p.cells.some(([cx,cy])=>cx===x&&cy===y)){ d.className="pcell"; d.style.backgroundColor=themeColor(p.fam); }
+      el.appendChild(d);
+    }
+    el.addEventListener("pointerdown", e=>startDrag(e,i));
+    slot.appendChild(el);
+  }
+}
+
+/* ---------------- Drag & drop ---------------- */
+let drag=null; // {piece, idx, grabDX, grabDY, cs, xs, ys, snapped:{col,row}|null}
+
+// Grey out tray pieces that currently can't be placed anywhere on the board.
+// Called after every board change; pieces stay grabbable so you can pick them up and see for yourself.
+function refreshUnplaceable(){ [0,1,2].forEach(i=>{ const el=document.getElementById("slot"+i); if(!el) return; const p=el.querySelector(".piece"); if(!p) return; p.classList.toggle("unplaceable", !!tray[i] && !canFitAnywhere(tray[i])); }); }
+
+function startDrag(e, idx){
+  if(over || !tray[idx]) return;
+  e.preventDefault();
+  const piece=tray[idx];
+  const pos=gridPositions();
+  const cell0=cells[0].getBoundingClientRect();
+  const cs=cell0.width;
+
+  // build floating clone at exact board metrics (incl. block gaps when spanning)
+  dragPieceEl.innerHTML="";
+  let maxW=0,maxH=0;
+  for(const [x,y] of piece.cells){
+    const d=document.createElement("div");
+    d.className="dcell"; d.style.backgroundColor=themeColor(piece.fam);
+    d.style.width=cs+"px"; d.style.height=cs+"px";
+    // relative position computed against origin cell later on snap; start free: use uniform grid for grab offset
+    maxW=Math.max(maxW, (x+1)*cs); maxH=Math.max(maxH,(y+1)*cs);
+    dragPieceEl.appendChild(d);
+  }
+  dragPieceEl.style.width=maxW+"px"; dragPieceEl.style.height=maxH+"px";
+  dragPieceEl.style.display="block";
+
+  // exact visual half-size of this piece at board scale (measured from the
+  // real grid, gaps included) so the pointer stays on the piece's true center
+  const grabDX=((pos.xs[Math.min(piece.w,SIZE)-1]-pos.xs[0])+cs)/2;
+  const grabDY=((pos.ys[Math.min(piece.h,SIZE)-1]-pos.ys[0])+cs)/2;
+
+  const el=e.currentTarget; // the .piece element (e.target may be an inner cell)
+  el.setPointerCapture(e.pointerId);
+  el.classList.add("dragging");
+
+  drag={ piece, idx, grabDX, grabDY, cs, xs:pos.xs, ys:pos.ys, el, snapped:null };
+
+  // position AFTER `drag` is set (positionClone reads drag.cs)
+  positionClone(e.clientX-grabDX, e.clientY-grabDY, piece, null, pos);
+
+  const up=ev=>{
+    // a real drop places the piece; pointercancel (gesture interrupted by
+    // the browser/OS) just aborts without placing
+    finishDrag(ev.type!=="pointercancel");
+    try{ el.releasePointerCapture(e.pointerId); }catch(_){}
+  };
+  el.addEventListener("pointermove", ev=>{ if(drag) onDragMove(ev); });
+  el.addEventListener("pointerup", up, {once:true});
+  el.addEventListener("pointercancel", up, {once:true});
+
+  sfxPick();
+}
+
+function onDragMove(ev){
+  if(!drag) return;
+  clearGhost();
+  const left=ev.clientX-drag.grabDX, top=ev.clientY-drag.grabDY;
+  // find nearest grid origin for the piece's top-left cell
+  const c=nearest(drag.xs, left), r=nearest(drag.ys, top);
+  const inRange = c.d < drag.cs*0.9 && r.d < drag.cs*0.9;
+  if(inRange){
+    // clamp the origin so the whole piece stays on the board (no spillover)
+    const col=Math.min(Math.max(c.i,0),SIZE-drag.piece.w);
+    const row=Math.min(Math.max(r.i,0),SIZE-drag.piece.h);
+    // always render the clone at the exact grid position we would place on,
+    // so the preview is pixel-identical to the drop (no snap "jump")
+    positionClone(drag.xs[col],drag.ys[row],drag.piece,{col,row},{xs:drag.xs,ys:drag.ys});
+    const can=canPlaceAt(drag.piece,col,row);
+    dragPieceEl.classList.toggle("invalid",!can);  // held piece turns red when it won't fit here
+    if(can){
+      drag.snapped={col,row};
+      paintGhost(drag.piece,col,row,true);         // green = can drop here
+      const clears=findCompleting(drag.piece,col,row);
+      for(const i of clears) cells[i].classList.add("ghost-clear"); // gold = will clear on drop
+    } else {
+      drag.snapped=null;
+      paintBlocked(drag.piece,col,row);            // red on occupied cells only
+    }
+  } else {
+    drag.snapped=null;
+    dragPieceEl.classList.remove("invalid");
+    positionClone(left,top,drag.piece,null,{xs:drag.xs,ys:drag.ys});
+  }
+}
+
+function positionClone(left,top,piece,snapped,pos){
+  dragPieceEl.style.left=left+"px";
+  dragPieceEl.style.top=top+"px";
+  dragPieceEl.classList.toggle("dimmed", !snapped);
+  const cs=drag.cs;
+  // lay cells out at true board coordinates (so block-boundary gaps line up)
+  piece.cells.forEach(([x,y],k)=>{
+    const d=dragPieceEl.children[k];
+    let px,py;
+    if(snapped && pos){ px=pos.xs[snapped.col+x]-pos.xs[snapped.col]; py=pos.ys[snapped.row+y]-pos.ys[snapped.row]; }
+    else { px=x*cs; py=y*cs; } // free follow: uniform spacing is fine
+    d.style.left=px+"px"; d.style.top=py+"px";
+  });
+}
+
+function paintGhost(piece,col,row,ok){
+  for(const [x,y] of piece.cells){
+    const i=(row+y)*SIZE+(col+x);
+    if(i<0||i>=SIZE*SIZE) continue;
+    cells[i].classList.add(ok?"ghost-ok":"ghost-bad");
+  }
+}
+// invalid preview: red on the occupied cells that block us, soft neutral
+// tint on the empty cells we would land on
+function paintBlocked(piece,col,row){
+  for(const [x,y] of piece.cells){
+    const i=(row+y)*SIZE+(col+x);
+    if(i<0||i>=SIZE*SIZE) continue;
+    cells[i].classList.add(board[i]?"ghost-bad":"ghost-mid");
+  }
+}
+// rows / columns / 3x3 sections that would be COMPLETE if `piece` were dropped at col,row
+function findCompleting(piece,col,row){
+  const covered=new Set();
+  for(const [x,y] of piece.cells) covered.add((row+y)*SIZE+(col+x));
+  const isFull=line=>line.every(i=>board[i]||covered.has(i));
+  const out=new Set();
+  for(let r=0;r<SIZE;r++){ const line=[]; for(let c=0;c<SIZE;c++)line.push(r*SIZE+c); if(isFull(line)) line.forEach(i=>out.add(i)); }
+  for(let c=0;c<SIZE;c++){ const line=[]; for(let r=0;r<SIZE;r++)line.push(r*SIZE+c); if(isFull(line)) line.forEach(i=>out.add(i)); }
+  for(let br=0;br<3;br++)for(let bc=0;bc<3;bc++){
+    const sec=[]; for(let r=0;r<3;r++)for(let c=0;c<3;c++)sec.push((br*3+r)*SIZE+(bc*3+c));
+    if(isFull(sec)) sec.forEach(i=>out.add(i));
+  }
+  return out;
+}
+function clearGhost(){ for(const el of cells) el.classList.remove("ghost-ok","ghost-bad","ghost-mid","ghost-clear"); }
+
+function finishDrag(place){
+  const d=drag; drag=null;
+  clearGhost();
+  dragPieceEl.style.display="none";
+  if(d && d.el && d.el.classList) d.el.classList.remove("dragging");
+  if(place && d.snapped){ placePiece(d.idx, d.snapped.col, d.snapped.row); }
+}
+
+/* ---------------- Placing & clearing ---------------- */
+function placePiece(idx,col,row){
+  const piece=tray[idx];
+  for(const [x,y] of piece.cells) board[(row+y)*SIZE+(col+x)] = piece.fam;   // store family key so themes can re-color placed blocks
+  for(let y=0;y<piece.h;y++)for(let x=0;x<piece.w;x++){
+    const i=(row+y)*SIZE+(col+x);
+    if(board[i]) paintCell(i,true);
+  }
+  score += piece.cells.length;
+  tray[idx]=randomPiece();   // instant per-slot refill
+
+  // find full rows, columns & 3x3 sections
+  const fullRows=[],fullCols=[],fullSecs=[];
+  for(let r=0;r<SIZE;r++){ let f=true; for(let c=0;c<SIZE;c++) if(!board[r*SIZE+c]){f=false;break;} if(f) fullRows.push(r); }
+  for(let c=0;c<SIZE;c++){ let f=true; for(let r=0;r<SIZE;r++) if(!board[r*SIZE+c]){f=false;break;} if(f) fullCols.push(c); }
+  for(let br=0;br<3;br++)for(let bc=0;bc<3;bc++){
+    let f=true;
+    for(let r=0;r<3&&f;r++)for(let c=0;c<3&&f;c++) if(!board[(br*3+r)*SIZE+(bc*3+c)]) f=false;
+    if(f) fullSecs.push([br,bc]);
+  }
+
+  const nLines=fullRows.length+fullCols.length+fullSecs.length;
+  if(nLines>0){
+    combo++;
+    const pts = (10*nLines + Math.max(0,nLines-1)*15) * Math.min(combo,5);
+    score += pts;
+    // build a label like "2 LINES + 1 SECTION · COMBO ×3"
+    let sub="";
+    if(nLines>1){
+      const parts=[]; const lineN=fullRows.length+fullCols.length;
+      if(lineN) parts.push(lineN+" LINE"+(lineN>1?"S":""));
+      if(fullSecs.length) parts.push(fullSecs.length+" SECTION"+(fullSecs.length>1?"S":""));
+      sub=parts.join(" + ");
+    }
+    if(combo>1) sub+=(sub?" · ":"")+"COMBO ×"+Math.min(combo,5);
+    if(!sub) sub="NICE!";
+    floatScore("+"+pts, sub);
+    sfxClear(nLines);
+
+    const cleared=new Set();
+    fullRows.forEach(r=>{ for(let c=0;c<SIZE;c++) cleared.add(r*SIZE+c); });
+    fullCols.forEach(c=>{ for(let r=0;r<SIZE;r++)  cleared.add(r*SIZE+c); });
+    fullSecs.forEach(([br,bc])=>{ for(let r=0;r<3;r++)for(let c=0;c<3;c++) cleared.add((br*3+r)*SIZE+(bc*3+c)); });
+    for(const i of cleared){
+      const fam=board[i];
+      board[i]=null;
+      const el=cells[i];
+      el.style.backgroundColor=themeColor(fam); // keep its color during the boom animation
+      el.classList.remove("pop");
+      void el.offsetWidth;             // restart animation
+      el.classList.add("boom");
+      setTimeout(()=>{ if(board[i]===null){ el.style.background=""; el.classList.remove("filled","boom"); } },420);
+    }
+  } else {
+    combo=0;
+    sfxPlace();
+  }
+
+  renderTray();
+  updateHud();
+  refreshUnplaceable();
+
+  if(!tray.some(p=>p && canFitAnywhere(p))) gameOver();
+}
+
+/* ---------------- HUD / feedback ---------------- */
+function updateHud(){
+  $("scoreVal").textContent=score;
+  if(score>best){ best=score; localStorage.setItem("bb9_best",best); }
+  $("bestVal").textContent=best;
+}
+function floatScore(txt, sub){
+  const d=document.createElement("div");
+  d.className="floatscore";
+  d.innerHTML = txt + (sub?`<small>${sub}</small>`:"");
+  $("boardWrap").appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+
+/* ---------------- Game over / restart ---------------- */
+function gameOver(){
+  over=true;
+  sfxOver();
+  const isBest = score>=best && score>0;
+  $("finalScore").textContent=score;
+  $("newBestTag").style.display=isBest?"block":"none";
+  $("finalBest").textContent="Best: "+best;
+  setTimeout(()=>$("overlay").classList.add("show"), 450);
+}
+function newGame(){
+  board=new Array(SIZE*SIZE).fill(null);
+  score=0; combo=0; over=false;
+  for(let i=0;i<3;i++) tray[i]=randomPiece();
+  $("overlay").classList.remove("show");
+  for(let i=0;i<cells.length;i++){
+    const r=Math.floor(i/SIZE), c=i%SIZE;
+    cells[i].className="cell s"+(Math.floor(r/3)*3+Math.floor(c/3));
+    cells[i].style.background="";
+  }
+  updateHud(); renderTray(); layout();
+}
+
+/* ---------------- Sound (tiny WebAudio synth) ---------------- */
+let actx=null;
+function ac(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(freq,t0,dur,type="sine",vol=0.16,slideTo){
+  const a=ac(); if(!a||muted) return;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,a.currentTime+t0);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime+t0+dur);
+  g.gain.setValueAtTime(vol,a.currentTime+t0);
+  g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+t0+dur);
+  o.connect(g).connect(a.destination);
+  o.start(a.currentTime+t0); o.stop(a.currentTime+t0+dur+0.02);
+}
+function sfxPick(){ tone(340,0,.07,"triangle",.10,520); }
+function sfxPlace(){ tone(220,0,.09,"square",.10,180); }
+function sfxClear(n){ for(let i=0;i<Math.min(n+2,6);i++) tone(420+i*130,i*.06,.12,"triangle",.15,700+i*150); }
+function sfxOver(){ [392,311,262,196].forEach((f,i)=>tone(f,i*.18,.22,"sawtooth",.10,f*.9)); }
+
+/* ---------------- Wiring ---------------- */
+$("newGameBtn").addEventListener("click",()=>{ ac(); newGame(); });
+$("againBtn").addEventListener("click",()=>{ ac(); newGame(); });
+$("muteBtn").addEventListener("click",function(){
+  muted=!muted; localStorage.setItem("bb9_muted",muted?"1":"0");
+  this.textContent=muted?"🔇":"🔊";
+});
+$("themeBtn").addEventListener("click",(e)=>{ e.stopPropagation(); buildThemeMenu(); $("themeMenu").classList.toggle("hidden"); });
+document.addEventListener("pointerdown",(e)=>{
+  const m=$("themeMenu");
+  if(m && !m.classList.contains("hidden") && !m.contains(e.target) && e.target.id!=="themeBtn") m.classList.add("hidden");
+});
+window.addEventListener("resize",layout);
+document.addEventListener("pointerdown",()=>ac(),{once:true}); // unlock audio on first gesture
+
+// init
+$("muteBtn").textContent = muted ? "🔇" : "🔊";
+buildBoard();
+newGame();
+applyTheme(curTheme,false);
+</script>
+</body>
+</html>
