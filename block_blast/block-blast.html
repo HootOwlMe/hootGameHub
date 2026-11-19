@@ -19,6 +19,7 @@
     background: radial-gradient(1200px 800px at 70% -10%, #232c5c 0%, var(--bg2) 45%, var(--bg1) 100%) fixed;
     color: var(--text);
     overflow-x: hidden;
+    overscroll-behavior: none;   /* no pull-to-refresh / rubber-banding while playing */
     min-height: 100%;
   }
 
@@ -77,6 +78,7 @@
   main{
     display:flex; gap: 22px; align-items:center; justify-content:center;
     max-width: 980px; margin: 0 auto; padding: 10px 16px 24px;
+    touch-action:none;   /* touches in the play area never pan/scroll the page */
   }
 
   /* ---------- Board ---------- */
@@ -156,6 +158,7 @@
     text-align:center; margin-bottom:-4px;
   }
   .slot{
+    touch-action:none;
     background: var(--panel); border-radius: 16px; min-height: 96px;
     display:flex; align-items:center; justify-content:center;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 8px 22px rgba(0,0,0,.35);
@@ -213,9 +216,20 @@
     #tray{ flex-direction:row; width:auto; justify-content:center; order:2; }
     #tray h2{ display:none; }
     .slot{ min-height: 84px; width: clamp(90px, 26vw, 130px); }
-    header{ padding-top:10px; }
+    header{ flex-direction:column; align-items:center; gap:8px; padding-top:10px; padding-bottom:2px; }
+    .hud{ flex-wrap:wrap; justify-content:center; width:100%; max-width:460px; }
+    button.hudbtn{ padding:9px 12px; font-size:14px; }
     .scorebox{ min-width:70px; padding:5px 10px; }
     .scorebox .value{ font-size:17px; }
+  }
+
+  /* short landscape phones (e.g. phone turned sideways): compress vertical space */
+  @media (orientation:landscape) and (max-height:520px){
+    header{ padding-top:8px; gap:8px; }
+    main{ padding-bottom:10px; gap:12px; }
+    #tray{ gap:10px; }
+    .slot{ min-height:72px; }
+    .hint{ display:none; }
   }
 </style>
 </head>
@@ -422,7 +436,7 @@ function paintCell(i, animate){
 function layout(){
   const trayW = window.innerWidth>640 ? Math.min(Math.max(window.innerWidth*0.22,130),200)+42 : 0;
   const availW = window.innerWidth - trayW - 60;
-  const availH = window.innerHeight - (window.innerWidth>640?150:320);
+  const availH = window.innerHeight - (window.innerWidth>640?150:340);   /* header wraps to 2 lines on phones */
   let size = Math.min(availW, availH, 620);
   // board width = 9*cs + 8*GAP + 2*PAD
   const cs = Math.max(20, Math.floor((size - (8*GAP + 2*PAD)) / 9));
