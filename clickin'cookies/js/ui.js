@@ -14,6 +14,7 @@
   let activeTab = 'buildings';
   const bRows = {};          // buildingId -> row DOM refs
   const uTiles = {};         // upgradeId  -> tile DOM ref
+  const cRows = {};          // consumableId -> row DOM refs
   const hRows = {};          // hUpgradeId -> row DOM refs
   const aItems = {};         // achievementId -> li ref
   let lastGoldenRef = null;  // to detect spawn transitions
@@ -314,6 +315,84 @@
     }
   }
 
+  /* ---------------- build: consumables ----------------------------------
+   * Temporary power-ups. Each row shows a LIVE price (fixed cost + % of the
+   * current bank), and once bought it flips to an active countdown; buying
+   * again re-arms the full duration.
+   * --------------------------------------------------------------------- */
+  function buildConsumableList() {
+    const ul = $('consumable-list');
+    if (!ul) return;
+    D.CONSUMABLES.forEach(function (c) {
+      const li = el('li', 'c-row');
+      li.dataset.id = c.id;
+
+      const sprite = el('span', 'sprite sprite--' + c.id);
+      sprite.appendChild(el('i', 'art'));
+
+      const info = el('div', 'c-info');
+      // Name + a ⏱ chip showing how long this item rests after use.
+      const head = el('div', 'c-head');
+      head.appendChild(el('span', 'c-name', c.name));
+      head.appendChild(el('span', 'c-cd', '\u23F1\uFE0F ' + (c.cooldownMs / 60000) + ' min'));
+      info.appendChild(head);
+      info.appendChild(el('div', 'c-cost'));
+      info.appendChild(el('div', 'c-desc muted',
+        c.desc + ' Price: ' + F.int(c.baseCost) + ' + ' + Math.round(c.bankPct * 100) + '% of your bank.'));
+
+      const state = el('div', 'c-state', '');
+      li.appendChild(sprite); li.appendChild(info); li.appendChild(state);
+      li.title = c.desc;
+      li.addEventListener('click', function () {
+        if (CC.buyConsumable(c.id)) {
+          flashRow(li);
+          toast('consumable', c.name + '! ' + c.desc);
+        }
+      });
+      ul.appendChild(li);
+      cRows[c.id] = { li: li, cost: info.children[1], state: state };
+    });
+  }
+
+  /** Consumables: live price, affordability, active-buff countdown. */
+  /** Consumables: live price, active countdown, "one at a time", or cooldown. */
+  function refreshConsumables() {
+    const S = CC.S;
+    const t = Date.now();
+    // Only one power-up runs at a time — find which one (if any).
+    let busyId = null;
+    if (S.consumableBuffs) {
+      for (const id in S.consumableBuffs) {
+        if (S.consumableBuffs[id].until > t) { busyId = id; break; }
+      }
+    }
+    D.CONSUMABLES.forEach(function (c) {
+      const r = cRows[c.id];
+      if (!r) return;
+      const b = S.consumableBuffs ? S.consumableBuffs[c.id] : null;
+      const active = !!(b && b.until > t);
+      const cooling = !active && !!(b && b.cdUntil > t);
+      const busy = !active && !cooling && !!busyId; // a different power-up is running
+      r.li.classList.toggle('active', active);
+      r.li.classList.toggle('cooling', cooling || busy); // dimmed while not startable
+      if (active) {
+        r.cost.textContent = '';
+        r.state.textContent = Math.ceil((b.until - t) / 1000) + 's left';
+      } else if (cooling) {
+        r.cost.textContent = '';
+        r.state.textContent = 'Ready in ' + Math.ceil((b.cdUntil - t) / 60000) + ' min';
+      } else if (busy) {
+        r.cost.textContent = '';
+        r.state.textContent = 'One at a time';
+      } else {
+        const cost = CC.consumableCost(c.id);
+        r.cost.textContent = F.int(cost) + ' cookies';
+        r.state.textContent = '';
+        r.li.classList.toggle('cant', S.cookies < cost);
+      }
+    });
+  }
+
   /* ---------------- build: stats + achievements ------------------------- */
   const STAT_DEFS = [
     ['st-cookies',     'Cookies in bank'],
@@ -400,6 +479,9 @@
     $('chip-mini').textContent = S.chips > 0 ? F.int(S.chips) + ' ◆' : '';
     refreshHeavenShop();
     refreshAscendBox();
+
+    // Consumables (live prices + active countdowns)
+    refreshConsumables();
 
     syncArmy();
 
@@ -548,6 +630,67 @@
   /* ---------------- store panel resizing --------------------------------- */
   const UI_KEY = 'cookieClickerClone.ui.v1';
 
+  /** Shared UI prefs (store width, theme) persisted under UI_KEY. */
+  function loadUIPrefs() {
+    try { return JSON.parse(window.localStorage.getItem(UI_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveUIPref(key, value) {
+    const p = loadUIPrefs();
+    p[key] = value;
+    try { window.localStorage.setItem(UI_KEY, JSON.stringify(p)); } catch (e) {}
+  }
+
+  /* ---------------- themes (color palettes) -----------------------------
+   * The palettes themselves live in css/style.css as [data-theme="..."]
+   * variable blocks. This picker sets the attribute on <html> and persists
+   * the choice; index.html applies it pre-paint so reloads never flash.
+   * --------------------------------------------------------------------- */
+  // swatch = [dark base, accent, light side] for the preview dots.
+  const THEMES = [
+    { id: 'original', name: 'Original',     swatch: ['#10151d', '#ffd97a', '#e9e6dd'] },
+    { id: 'mint',     name: 'Fresh Mint',   swatch: ['#0a1410', '#7bf1af', '#e4f0e9'] },
+    { id: 'cherry',   name: 'Cherry Cola',  swatch: ['#160d0f', '#ffab9e', '#f5e8e2'] },
+    { id: 'ocean',    name: 'Deep Ocean',   swatch: ['#0a1220', '#7ad7ff', '#e8eff7'] },
+    { id: 'sunset',   name: 'Sunset Dunes', swatch: ['#150f1c', '#ffb066', '#f4e9de'] },
+    { id: 'forest',   name: 'Forest Floor', swatch: ['#12100a', '#ffd27a', '#ece8da'] },
+    { id: 'neon',     name: 'Cyber Neon',   swatch: ['#0b0b14', '#6ef3ff', '#eceafa'] }
+  ];
+  const themeCards = {}; // themeId -> card button
+
+  function buildThemePanel() {
+    const grid = $('theme-grid');
+    if (!grid) return;
+    THEMES.forEach(function (t) {
+      const card = el('button', 'theme-card', null);
+      card.type = 'button';
+      card.dataset.themeId = t.id;
+
+      const swatches = el('span', 'swatch-row');
+      t.swatch.forEach(function (col) {
+        const s = document.createElement('i');
+        s.style.background = col;
+        swatches.appendChild(s);
+      });
+      card.appendChild(swatches);
+      card.appendChild(el('span', 't-name', t.name));
+      card.appendChild(el('span', 't-active-tag', 'ACTIVE'));
+
+      card.addEventListener('click', function () { applyTheme(t.id, true); });
+      grid.appendChild(card);
+      themeCards[t.id] = card;
+    });
+  }
+
+  /** Set the palette on <html> and (optionally) persist it. */
+  function applyTheme(id, persist) {
+    if (!THEMES.some(function (t) { return t.id === id; })) id = 'original';
+    document.documentElement.setAttribute('data-theme', id);
+    Object.keys(themeCards).forEach(function (k) {
+      themeCards[k].classList.toggle('active', k === id);
+    });
+    if (persist) saveUIPref('theme', id);
+  }
+
   function currentStoreW() {
     return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--store-w'), 10) || 520;
   }
@@ -561,10 +704,8 @@
   function initResizer() {
     const bar = $('store-resizer');
     if (!bar) return;
-    try {
-      const p = JSON.parse(window.localStorage.getItem(UI_KEY) || '{}');
-      if (p.storeW) setStoreW(p.storeW);
-    } catch (e) {}
+    const p = loadUIPrefs();
+    if (p.storeW) setStoreW(p.storeW);
 
     let dragging = false;
     bar.addEventListener('pointerdown', function (e) {
@@ -583,7 +724,7 @@
       if (!dragging) return;
       dragging = false;
       document.body.classList.remove('resizing');
-      try { window.localStorage.setItem(UI_KEY, JSON.stringify({ storeW: currentStoreW() })); } catch (e) {}
+      saveUIPref('storeW', currentStoreW()); // merge — keeps the theme pref
     };
     bar.addEventListener('pointerup', end);
     bar.addEventListener('pointercancel', end);
@@ -746,14 +887,31 @@
       doGoldenTap();
     });
 
-    // Tabs
+    // Tabs — each one shows exactly one store section.
+    const TAB_PANELS = {
+      buildings: 'building-list',
+      upgrades: 'upgrade-grid',
+      consumables: 'consumable-panel',
+      heaven: 'heaven-panel',
+      themes: 'theme-panel'
+    };
+    const TAB_TITLES = {
+      buildings: 'Build your cookie empire',
+      upgrades: 'Permanent production & click upgrades',
+      consumables: 'Temporary power-ups — one at a time, each with a cooldown',
+      heaven: 'Ascend for heavenly chips',
+      themes: 'Pick a color palette (saved automatically)'
+    };
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () {
         activeTab = t.dataset.tab;
         document.querySelectorAll('.tab').forEach(function (x) { x.classList.toggle('active', x === t); });
-        $('building-list').classList.toggle('hidden', activeTab !== 'buildings');
-        $('upgrade-grid').classList.toggle('hidden', activeTab !== 'upgrades');
-        $('heaven-panel').classList.toggle('hidden', activeTab !== 'heaven');
+        Object.keys(TAB_PANELS).forEach(function (k) {
+          $(TAB_PANELS[k]).classList.toggle('hidden', activeTab !== k);
+        });
+        $('store-title').textContent = TAB_TITLES[activeTab] || '';
+        // The x1/x10 toggle only applies to buildings.
+        $('buy-qty').style.display = activeTab === 'buildings' ? '' : 'none';
         refreshStore(); // badge visibility depends on tab
       });
     });
@@ -825,9 +983,15 @@
 
     buildBuildingList();
     buildUpgradeGrid();
+    buildConsumableList();
     buildHeavenPanel();
+    buildThemePanel();
     buildStats();
     buildAchievements();
+
+    // Re-apply the saved theme (index.html already set it pre-paint) so the
+    // picker's ACTIVE state matches, then let refreshStore paint costs.
+    applyTheme(loadUIPrefs().theme || 'original', false);
     initResizer();
     initViewportLock();
     bindEvents();

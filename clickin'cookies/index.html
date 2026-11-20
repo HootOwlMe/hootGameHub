@@ -12,6 +12,14 @@
 <!-- Custom sprites (user art in assets/) — must load AFTER style.css so its
      overrides win. Remove this line to fall back to the CSS-drawn art. -->
 <link rel="stylesheet" href="assets/custom.css">
+<script>
+  /* Apply the saved color theme BEFORE first paint so a page load never
+     flashes the original palette. ui.js re-applies + persists this choice. */
+  try {
+    var _ccp = JSON.parse(localStorage.getItem('cookieClickerClone.ui.v1') || '{}');
+    if (_ccp.theme) document.documentElement.setAttribute('data-theme', _ccp.theme);
+  } catch (e) { /* no save yet — original palette */ }
+</script>
 </head>
 <body>
 <div id="app">
@@ -62,7 +70,9 @@
     <nav id="tabs" role="tablist">
       <button class="tab active" data-tab="buildings" type="button" role="tab">Buildings</button>
       <button class="tab" data-tab="upgrades" type="button" role="tab">Upgrades<span id="upg-badge" class="badge hidden">0</span></button>
+      <button class="tab" data-tab="consumables" type="button" role="tab">Consumables</button>
       <button class="tab" data-tab="heaven" type="button" role="tab">Heaven<span id="chip-mini" class="chips-mini"></span></button>
+      <button class="tab" data-tab="themes" type="button" role="tab">Themes</button>
     </nav>
 
     <div id="store-head">
@@ -76,6 +86,18 @@
     <main id="store-scroll">
       <ul id="building-list"></ul>
       <div id="upgrade-grid" class="hidden"></div>
+
+      <!-- Consumables: temporary power-ups (built by js/ui.js) -->
+      <section id="consumable-panel" class="hidden">
+        <p id="consumable-note">Temporary power-ups — only one at a time. Each has a cooldown (shown per item).</p>
+        <ul id="consumable-list"></ul>
+      </section>
+
+      <!-- Themes: color palette picker (cards built by js/ui.js) -->
+      <section id="theme-panel" class="hidden">
+        <p id="theme-note">Pick a look for your cookie empire. Your choice is saved and applies the moment you reload.</p>
+        <div id="theme-grid"></div>
+      </section>
 
       <section id="heaven-panel" class="hidden">
         <div id="ascend-box">

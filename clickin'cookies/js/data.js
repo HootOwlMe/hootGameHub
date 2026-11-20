@@ -19,13 +19,14 @@
     { id: 'bank',       name: 'Bank',                 baseCost: 1400000,  cps: 1400,   blurb: 'Interest from all those cookies adds up.' },
     { id: 'temple',     name: 'Temple',               baseCost: 2e7,      cps: 7800,   blurb: 'An ancient temple dedicated to the Great Cookie.' },
     { id: 'wizard',     name: 'Wizard tower',         baseCost: 3.3e8,    cps: 44000,  blurb: 'Summons cookies with arcane magic.' },
-    // Shipment and above got a +50% base-CpS buff (late-game pacing).
-    { id: 'shipment',   name: 'Shipment',             baseCost: 5.1e9,    cps: 390000, blurb: 'Brings in fresh cookies from the Cookie Planet.' },
-    { id: 'alchemy',    name: 'Alchemy lab',          baseCost: 7.5e10,   cps: 2.4e6,  blurb: 'Turns gold into cookies. (The reverse of normal alchemy.)' },
-    { id: 'portal',     name: 'Portal',               baseCost: 1e12,     cps: 1.5e7,  blurb: 'Opens a door to the Cookieverse, where cookies are native.' },
-    { id: 'timemachine',name: 'Time machine',         baseCost: 1.4e13,   cps: 9.75e7, blurb: 'Brings cookies from the past, before they were even eaten.' },
-    { id: 'antimatter', name: 'Antimatter condenser', baseCost: 1.7e14,   cps: 6.45e8, blurb: 'Condenses raw antimatter into sweet, sweet cookies.' },
-    { id: 'prism',      name: 'Prism',                baseCost: 2.1e15,   cps: 4.35e9, blurb: 'Refines pure light into cookies of flawless quality.' }
+    // Late-game pacing buffs (escalating down the ladder): shipment +15%,
+    // alchemy +35%, portal +50%, time machine +60%, antimatter +80%, prism x2.
+    { id: 'shipment',   name: 'Shipment',             baseCost: 5.1e9,    cps: 448500, blurb: 'Brings in fresh cookies from the Cookie Planet.' },
+    { id: 'alchemy',    name: 'Alchemy lab',          baseCost: 7.5e10,   cps: 3.24e6, blurb: 'Turns gold into cookies. (The reverse of normal alchemy.)' },
+    { id: 'portal',     name: 'Portal',               baseCost: 1e12,     cps: 2.25e7, blurb: 'Opens a door to the Cookieverse, where cookies are native.' },
+    { id: 'timemachine',name: 'Time machine',         baseCost: 1.4e13,   cps: 1.56e8, blurb: 'Brings cookies from the past, before they were even eaten.' },
+    { id: 'antimatter', name: 'Antimatter condenser', baseCost: 1.7e14,   cps: 1.161e9,blurb: 'Condenses raw antimatter into sweet, sweet cookies.' },
+    { id: 'prism',      name: 'Prism',                baseCost: 2.1e15,   cps: 8.7e9,  blurb: 'Refines pure light into cookies of flawless quality.' }
   ];
 
   /* ---------------- Upgrades ----------------------------------------- */
@@ -111,6 +112,29 @@
     { id: 'h_chip',    name: "Angel's favor",     cost: 120,desc: 'Every heavenly chip boosts production by +4% instead of +2%.', effect: { chipBonusAdd: 0.02 } }
   ];
 
+  /* ---------------- Consumables (temporary power-ups) ----------------
+   * One-shot buffs bought with cookies. Price = baseCost (fixed)
+   * + bankPct × the player's CURRENT cookie bank, so they always cost a
+   * meaningful slice of what you have on hand. Repurchasing while active
+   * re-arms the full duration.
+   * effect: prodMult  → multiplies all production for durMs
+   *         clickMult → multiplies clicking power for durMs
+   * ------------------------------------------------------------------ */
+  /* Temporary power-ups ("Consumables" store tab).
+   * Price = baseCost + bankPct × current cookie bank (evaluated at purchase),
+   * so they always cost a meaningful slice of what you hold.
+   * Cadence scales with power (weakest → strongest):
+   *   durMs      60 s / 90 s / 2 min / 3 min / 4 min
+   *   cooldownMs 10 / 15 / 20 / 25 / 30 minutes, starting when the effect ends.
+   * Not buyable while active or on cooldown. Effects are multiplicative and
+   * stack on top of golden-cookie frenzy. */
+  const CONSUMABLES = [
+    { id: 'c_soda',   name: 'Crumb soda',       baseCost: 2e4,   bankPct: 0.03, durMs: 900000,  cooldownMs: 600000,  effect: { clickMult: 11 },          desc: 'Clicking power x11 for 15 minutes.' },
+    { id: 'c_frenzy', name: 'Frenzy in a can',  baseCost: 5e5,   bankPct: 0.04, durMs: 30000,  cooldownMs: 900000,  effect: { prodMult: 7 },           desc: 'All cookie production x7 for 30 seconds.' },
+    { id: 'c_storm',  name: 'Cookie storm',     baseCost: 2e7,   bankPct: 0.06, durMs: 180000, cooldownMs: 1500000, effect: { prodMult: 3 },           desc: 'All cookie production x3 for a long 3 minutes.' },
+    { id: 'c_burst',  name: 'Antimatter shakeup', baseCost: 1e8,   bankPct: 0.90, durMs: 240000, cooldownMs: 1800000, effect: { prodMult: 15, clickMult: 15 }, desc: 'EVERYTHING x15 for a full 4 minutes.' }
+  ];
+
   /* ---------------- Achievements -------------------------------------
    * Each unlocked achievement grants +2% to all production.
    * check(state, ctx) where ctx = { cps(), totalBuildings() }
@@ -172,12 +196,29 @@
     '{who} demands fair wages in crumbs. Management declines.',
     'Antimatter condenser rated five stars by local food critics.',
     'Prism produces first light-baked cookie; connoisseurs weep openly.',
-    'Golden cookies sighted in the wild. Experts advise clicking quickly.'
+    'Golden cookies sighted in the wild. Experts advise clicking quickly.',
+
+    // Extended edition (28 total) — every claim below matches live game rules.
+    '{who} reminds staff that cursors auto-click once every ten seconds. No exceptions.',
+    'Mine workers report a chocolate chip shortage; dough reserves hold firm.',
+    'Wizard tower summons cookies with arcane magic. Permit paperwork still pending.',
+    'Frenzy advisory in effect: x7 production for 18 seconds when the golden glow strikes.',
+    'Lucky cookie payout described as "six hundred seconds of work, delivered instantly" — minimum thirteen cookies guaranteed.',
+    'Golden cookies appear every 45 to 120 seconds and vanish after 13. Click fast.',
+    'Away from the oven? Baking continues while you are gone, up to eight hours by default.',
+    'Ascension desk opens: bake 500 million cookies in a run and earn your first heavenly chip.',
+    'Heavenly shop announces permanent upgrades. Chips spend best where they last forever.',
+    'Every achievement adds 2% to total production. Collectors rejoice.',
+    'Building prices rise 15% with each unit bought; x10 bulk orders remain popular.',
+    'Alchemy lab confirms it turns gold into cookies: "the reverse of normal alchemy."',
+    'Bank manager touts record cookie reserves as interest rates hit an all-time high.',
+    '{who} spotted near the prism, weeping quietly at the quality of light-baked cookies.'
   ];
 
   global.CC_DATA = {
     BUILDINGS: BUILDINGS,
     UPGRADES: UPGRADES,
+    CONSUMABLES: CONSUMABLES,
     H_UPGRADES: H_UPGRADES,
     ACHIEVEMENTS: ACHIEVEMENTS,
     NEWS: NEWS,

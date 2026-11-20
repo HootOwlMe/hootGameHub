@@ -47,6 +47,7 @@
       chips: 0,            // heavenly chips
       stats: { clicks: 0, goldenClicked: 0, frenzies: 0, playtimeMs: 0, ascensions: 0 },
       buff: null,          // { type:'frenzy', until:<ms epoch>, mult, dur }
+      consumableBuffs: {}, // id -> { until, cdUntil } active + cooling consumables (ms epochs)
       goldenActive: null,  // { leftMs } while a golden cookie is on screen
       nextGoldenIn: 25000 + Math.random() * 15000,
       lastSeen: Date.now(),
@@ -113,12 +114,37 @@
 
   function buffActive() { return !!(S.buff && S.buff.type === 'frenzy' && S.buff.until > now()); }
 
+  /** Production multiplier from ACTIVE consumable buffs (multiplicative).
+   *  Pure read — does not touch the cache/dirty flag. */
+  function consumableProdMult() {
+    let m = 1;
+    const t = now();
+    for (const id in S.consumableBuffs) {
+      if (S.consumableBuffs[id].until <= t) continue;
+      const c = consumableById(id);
+      if (c && c.effect && c.effect.prodMult) m *= c.effect.prodMult;
+    }
+    return m;
+  }
+
+  /** Click-power multiplier from ACTIVE consumable buffs. */
+  function consumableClickMult() {
+    let m = 1;
+    const t = now();
+    for (const id in S.consumableBuffs) {
+      if (S.consumableBuffs[id].until <= t) continue;
+      const c = consumableById(id);
+      if (c && c.effect && c.effect.clickMult) m *= c.effect.clickMult;
+    }
+    return m;
+  }
+
   /** Pure CPS computation — does NOT touch the cache/dirty flag.
    *  Used by achievement checks, which must not consume staleness. */
   function computeCps() {
     let base = 0;
     for (const b of D.BUILDINGS) base += S.buildings[b.id] * b.cps * buildingMult(b.id);
-    return base * globalAll() * (buffActive() ? S.buff.mult : 1);
+    return base * globalAll() * (buffActive() ? S.buff.mult : 1) * consumableProdMult();
   }
 
   function recomputeCps() {
@@ -148,7 +174,7 @@
     }
     // Frenzy multiplies ALL production, clicks included. The CpS term is
     // already buffed inside cps(); this covers the base × mult part as well.
-    return (base * mult + cps() * pct) * (buffActive() ? S.buff.mult : 1);
+    return (base * mult + cps() * pct) * (buffActive() ? S.buff.mult : 1) * consumableClickMult();
   }
 
   /** Player clicked the big cookie. Returns cookies gained. */
@@ -210,6 +236,44 @@
     if (!u || !upgradeVisible(u) || S.cookies < u.cost) return false;
     S.cookies -= u.cost;
     S.upgrades.push(id);
+    S._dirty = true;
+    checkAchievements();
+    return true;
+  }
+
+  /* ---------------- consumables (temporary power-ups) -----------------
+   * Price = baseCost + bankPct × CURRENT cookie bank, so a purchase always
+   * costs a meaningful slice of what you hold. Only ONE consumable can be
+   * active at a time — while one runs, the others cannot be started (their
+   * per-item cooldowns still run independently after they end: cooldownMs,
+   * scaled with power). The active effect stacks on top of golden-cookie
+   * frenzy. S.consumableBuffs[id] = { until, cdUntil } (ms epochs; cdUntil > until). */
+  function consumableById(id) { for (const c of D.CONSUMABLES) if (c.id === id) return c; return null; }
+
+  /** Live price (depends on the current bank). Infinity for unknown ids. */
+  function consumableCost(id) {
+    const c = consumableById(id);
+    if (!c) return Infinity;
+    return Math.ceil(c.baseCost + c.bankPct * S.cookies);
+  }
+
+  /** Buy a consumable. Returns false if another power-up is running, this one
+   *  is on cooldown, or it is too expensive. */
+  function buyConsumable(id) {
+    const c = consumableById(id);
+    if (!c) return false;
+    const t = now();
+    // One at a time: refuse to start while any OTHER consumable is active.
+    for (const otherId in S.consumableBuffs) {
+      if (otherId !== id && S.consumableBuffs[otherId].until > t) return false;
+    }
+    const existing = S.consumableBuffs[id];
+    if (existing && existing.cdUntil > t) return false; // active or cooling
+    const cost = consumableCost(id);
+    if (!isFinite(cost) || S.cookies < cost) return false;
+    S.cookies -= cost;
+    const until = t + c.durMs;
+    S.consumableBuffs[id] = { until: until, cdUntil: until + c.cooldownMs };
     S._dirty = true;
     checkAchievements();
     return true;
@@ -352,10 +416,20 @@
   function tick(dtMs) {
     if (dtMs <= 0) return;
     const dt = Math.min(dtMs, 6 * 3600e3); // safety cap; absences are handled by offline earnings on load
+    const t = now();
 
     S.stats.playtimeMs += dt;
 
-    if (S.buff && now() > S.buff.until) { S.buff = null; S._dirty = true; }
+    if (S.buff && t > S.buff.until) { S.buff = null; S._dirty = true; }
+
+    // Consumables: invalidate the CPS cache the moment an effect ENDS
+    // (the entry lingers until its cooldown finishes so the UI can show it),
+    // then drop fully-cooled entries.
+    for (const id in S.consumableBuffs) {
+      const b = S.consumableBuffs[id];
+      if (b.until <= t && !b.expiredNoted) { b.expiredNoted = true; S._dirty = true; }
+      if (b.cdUntil <= t) delete S.consumableBuffs[id];
+    }
 
     addCookies(cps() * dt / 1000);
 
@@ -442,6 +516,11 @@
         S.hUpgrades = Array.isArray(p.hUpgrades) ? p.hUpgrades : [];
         S.achievements = Array.isArray(p.achievements) ? p.achievements : [];
         S.buff = (p.buff && typeof p.buff.until === 'number' && p.buff.until > now()) ? p.buff : null;
+        // Consumables: keep only well-formed entries (active OR cooling).
+        for (const id in (S.consumableBuffs || {})) {
+          const b = S.consumableBuffs[id];
+          if (!b || typeof b.until !== 'number' || typeof b.cdUntil !== 'number') delete S.consumableBuffs[id];
+        }
         S.goldenActive = null; // never restore an in-flight golden cookie
         S._dirty = true;       // recompute CPS against the current clock
         ok = true;
@@ -485,6 +564,9 @@
     upgradeReqMet: upgradeReqMet,
     upgradeVisible: upgradeVisible,
     buyUpgrade: buyUpgrade,
+    consumableById: consumableById,
+    consumableCost: consumableCost,
+    buyConsumable: buyConsumable,
     hUpgradeById: hUpgradeById,
     buyHUpgrade: buyHUpgrade,
     hReqMet: hReqMet,
