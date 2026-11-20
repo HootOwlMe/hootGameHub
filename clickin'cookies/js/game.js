@@ -5,8 +5,12 @@
  *
  * Economy model (see README.md for details & deviations from original):
  *   cps      = Σ(units × unitCps × buildingMults) × globalAll × buffMult
- *   globalAll= (1 + 2%·chips) × (1 + 2%·achievements) × Π(allMult upgrades)
+ *   globalAll= (1 + chipBonus·chips) × (1 + 2%·achievements)
+ *             × (1 + ascendBonus·ascensions, from heaven)
+ *             × Π(allMult upgrades, incl. heavenly tiers)
  *   click    = [(1 + baseClickAdds) × Π(clickMults) + cps × Σ(clickCpsPct)] × frenzy
+ *              (heavenly upgrades can add to all three click terms)
+ *   cost(nth) = ceil(baseCost × 1.15^owned × heavenlyCostDiscount)
  *   cost(nth) = ceil(baseCost × 1.15^owned)
  * ===================================================================*/
 (function (global) {
@@ -77,9 +81,27 @@
     return m;
   }
 
+  /** Effective per-chip production bonus (Angel's favor raises it). */
+  function chipBonus() { const add = hEffect('chipBonusAdd'); return T.CHIP_BONUS + (add !== null ? add : 0); }
+
+  /** Per-ascension production bonus rate from the Ascendant soul blessing. */
+  function ascensionBonusRate() { const r = hEffect('perAscension'); return r !== null ? r : 0; }
+
+  /** Building price multiplier (Bargain heaven < 1). Min wins if ever tiered. */
+  function costMult() {
+    let m = 1;
+    for (const id of S.hUpgrades) {
+      const h = hUpgradeById(id);
+      if (h && h.effect && h.effect.buildingCostMult !== undefined && h.effect.buildingCostMult < m) m = h.effect.buildingCostMult;
+    }
+    return m;
+  }
+
   function globalAll() {
-    let m = 1 + T.CHIP_BONUS * S.chips;              // heavenly chips: +2% each
+    let m = 1 + chipBonus() * S.chips;               // heavenly chips (base +2% each, upgradeable)
     m *= 1 + T.ACHIEVEMENT_BONUS * S.achievements.length; // achievements: +2% each
+    const ap = ascensionBonusRate();
+    if (ap > 0) m *= 1 + ap * S.stats.ascensions;    // Ascendant soul: permanent per-ascension bonus
     for (const u of D.UPGRADES) {
       if (u.effect && u.effect.allMult && S.upgrades.indexOf(u.id) >= 0) m *= u.effect.allMult;
     }
@@ -121,6 +143,8 @@
     }
     for (const h of D.H_UPGRADES) if (S.hUpgrades.indexOf(h.id) >= 0 && h.effect) {
       if (h.effect.baseClickAdd) base += h.effect.baseClickAdd;
+      if (h.effect.clickMult) mult *= h.effect.clickMult;       // Serenity of touch
+      if (h.effect.clickCpsPct) pct += h.effect.clickCpsPct;    // Divine fingers
     }
     // Frenzy multiplies ALL production, clicks included. The CpS term is
     // already buffed inside cps(); this covers the base × mult part as well.
@@ -145,7 +169,8 @@
     if (!b) return Infinity;
     let total = 0;
     const o = S.buildings[id];
-    for (let i = 0; i < n; i++) total += Math.ceil(b.baseCost * Math.pow(T.COST_GROWTH, o + i));
+    const cm = costMult(); // heavenly discount (Bargain heaven)
+    for (let i = 0; i < n; i++) total += Math.ceil(b.baseCost * Math.pow(T.COST_GROWTH, o + i) * cm);
     return total;
   }
 
@@ -193,9 +218,17 @@
   /* ---------------- heavenly shop ------------------------------------ */
   function hUpgradeById(id) { for (const h of D.H_UPGRADES) if (h.id === id) return h; return null; }
 
+  /** True when a heavenly upgrade's prerequisite (if any) is owned. */
+  function hReqMet(h) {
+    const r = h && h.req;
+    if (!r || !r.hUpgrade) return true;
+    return S.hUpgrades.indexOf(r.hUpgrade) >= 0;
+  }
+
   function buyHUpgrade(id) {
     const h = hUpgradeById(id);
     if (!h || S.hUpgrades.indexOf(id) >= 0 || S.chips < h.cost) return false;
+    if (!hReqMet(h)) return false; // tier chain: requires the previous blessing
     S.chips -= h.cost;
     S.hUpgrades.push(id);
     S._dirty = true;
@@ -203,13 +236,24 @@
     return true;
   }
 
-  /** First heavenly-upgrade effect value for a key (e.g. offlineHours). */
+  /** First heavenly-upgrade effect value for a key (e.g. keepPct). */
   function hEffect(key) {
     for (const id of S.hUpgrades) {
       const h = hUpgradeById(id);
       if (h && h.effect && h.effect[key] !== undefined) return h.effect[key];
     }
     return null;
+  }
+
+  /** MAX effect value across owned heavenly upgrades — for tiered caps where a
+   *  later blessing raises the same key (offlineHours, offlineRate, frenzyDur). */
+  function hMax(key) {
+    let best = null;
+    for (const id of S.hUpgrades) {
+      const h = hUpgradeById(id);
+      if (h && h.effect && typeof h.effect[key] === 'number' && (best === null || h.effect[key] > best)) best = h.effect[key];
+    }
+    return best;
   }
 
   /** First regular-upgrade effect value for a key (e.g. offlineHours). */
@@ -233,28 +277,41 @@
   function frenzyMultValue() {
     let m = T.FRENZY_MULT;
     for (const u of D.UPGRADES) if (S.upgrades.indexOf(u.id) >= 0 && u.effect.frenzyMult) m = u.effect.frenzyMult;
+    const h = hEffect('frenzyMult'); // Divine fervor
+    if (h !== null && h > m) m = h;
     return m;
+  }
+
+  function frenzyDurMs() {
+    let d = T.FRENZY_DUR_MS;
+    const h = hMax('frenzyDur'); // Divine fervor
+    if (h !== null) d = Math.max(d, h);
+    return d;
   }
 
   function luckyPctValue() {
     let p = 1;
     for (const u of D.UPGRADES) if (S.upgrades.indexOf(u.id) >= 0 && u.effect.luckyPct) p *= u.effect.luckyPct;
+    const h = hEffect('luckyPct'); // Fortune's smile
+    if (h !== null) p *= h;
     return p;
   }
 
   function spawnGolden() { S.goldenActive = { leftMs: T.GOLDEN_LIFE_MS }; }
 
-  /** Player clicked the golden cookie. Returns {type, text, amount?} or null. */
-  function goldenClick() {
+  /** Player clicked the golden cookie. Returns {type, text, amount?} or null.
+   *  force: optional 'frenzy'|'lucky' (tests); omitted -> 50/50 random. */
+  function goldenClick(force) {
     if (!S.goldenActive) return null;
     S.goldenActive = null;
     S.stats.goldenClicked++;
     S.nextGoldenIn = gcIntervalMs();
 
     let info;
-    if (Math.random() < 0.5) {
+    const isFrenzy = force ? (force === 'frenzy') : (Math.random() < 0.5);
+    if (isFrenzy) {
       const mult = frenzyMultValue();
-      const dur = T.FRENZY_DUR_MS;
+      const dur = frenzyDurMs();
       S.buff = { type: 'frenzy', until: now() + dur, mult: mult, dur: dur };
       S.stats.frenzies++;
       S._dirty = true;
@@ -325,24 +382,37 @@
     return Math.floor(Math.pow(S.runBaked / T.ASCEND_DIVISOR, 0.4));
   }
 
+  /** Run-baked threshold for the NEXT chip (progress bar target). */
+  function nextChipAt() {
+    // chips(r) = floor((r/D)^0.4); first r with >= pot+1 chips: D * (pot+1)^(1/0.4)
+    return T.ASCEND_DIVISOR * Math.pow(potentialChips() + 1, 2.5);
+  }
+
   /** Reset the run for heavenly chips. Returns true on success. */
   function ascend() {
     const c = potentialChips();
     if (c < 1) return false;
 
     // Capture what survives ascension, then rebuild a fresh state.
+    const prevRunBaked = S.runBaked;
     const prevAllBaked = S.allBaked;
+    const prevChips = S.chips;           // unspent banked chips survive too
     const prevAchievements = S.achievements.slice();
     const prevHUpgrades = S.hUpgrades.slice();
     const prevStats = JSON.parse(JSON.stringify(S.stats));
 
     S = freshState();
     S.allBaked = prevAllBaked;
-    S.chips += c;
+    S.chips = prevChips + c;
     S.achievements = prevAchievements;
     S.hUpgrades = prevHUpgrades;
     S.stats = prevStats;
     S.stats.ascensions += 1;
+    // Heavenly grant: keep a slice of this run's baked cookies as a head start.
+    const keepPct = hEffect('keepPct');
+    if (keepPct !== null && prevRunBaked > 0) {
+      S.cookies = Math.floor(prevRunBaked * keepPct); // banked only — doesn't count toward run progress
+    }
     S._dirty = true;
     checkAchievements();
     CC.toasts.push({ kind: 'info', text: 'Ascended! +' + c + ' heavenly chip' + (c > 1 ? 's' : '') });
@@ -384,9 +454,9 @@
   /** Grant cookies earned while away (called by load()). */
   function offlineEarnings() {
     let capHours = T.OFFLINE_CAP_HOURS, rate = 1;
-    const hCap = hEffect('offlineHours');   if (hCap !== null) capHours = Math.max(capHours, hCap);
+    const hCap = hMax('offlineHours');      if (hCap !== null) capHours = Math.max(capHours, hCap);
     const uCap = upgradeEffect('offlineHours'); if (uCap !== null) capHours = Math.max(capHours, uCap);
-    const hRate = hEffect('offlineRate');   if (hRate !== null) rate = Math.max(rate, hRate);
+    const hRate = hMax('offlineRate');      if (hRate !== null) rate = Math.max(rate, hRate);
     const dt = now() - S.lastSeen;
     if (dt < T.OFFLINE_MIN_MS) return null;
     const t = Math.min(dt, capHours * 3600e3);
@@ -417,7 +487,12 @@
     buyUpgrade: buyUpgrade,
     hUpgradeById: hUpgradeById,
     buyHUpgrade: buyHUpgrade,
+    hReqMet: hReqMet,
     hEffect: hEffect,
+    chipBonus: chipBonus,
+    ascensionBonusRate: ascensionBonusRate,
+    costMult: costMult,
+    nextChipAt: nextChipAt,
     spawnGoldenForTest: spawnGolden,
     goldenClick: goldenClick,
     buffActive: buffActive,

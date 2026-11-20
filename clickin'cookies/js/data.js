@@ -77,12 +77,38 @@
     { id: 'synergy_7', name: 'Planetary alchemy',       cost: 8e10,  desc: 'Shipments and alchemy labs x2.',  req: { buildings: [{ building: 'shipment', count: 10 }, { building: 'alchemy', count: 10 }] },   effect: { buildings: ['shipment', 'alchemy'], value: 2 } }
   );
 
-  /* ---------------- Heavenly shop (bought with heavenly chips) ------- */
+  /* ---------------- Heavenly shop (bought with heavenly chips) -------
+   * req.hUpgrade : the prerequisite item that must be owned first
+   *                (tiered chains — "II"/"III" items unlock step by step).
+   * Same-key effects do NOT stack; later tiers simply set a higher value.
+   * ------------------------------------------------------------------ */
   const H_UPGRADES = [
+    // --- Tier I: the original four blessings --------------------------
     { id: 'h_click',   name: 'Angellic blessing', cost: 3,  desc: '+2 base cookies per click.',            effect: { baseClickAdd: 2 } },
     { id: 'h_cps',     name: 'Heavenly light',    cost: 10, desc: 'All cookie production x1.25.',          effect: { allMult: 1.25 } },
     { id: 'h_gc',      name: 'Lucky halo',        cost: 25, desc: 'Golden cookies appear far more often (interval x0.6).', effect: { gcInterval: 0.6 } },
-    { id: 'h_offline', name: 'Eternal patience',  cost: 50, desc: 'Offline earnings last up to 30 hours and pay double.',   effect: { offlineHours: 30, offlineRate: 2 } }
+    { id: 'h_offline', name: 'Eternal patience',  cost: 50, desc: 'Offline earnings last up to 30 hours and pay double.',   effect: { offlineHours: 30, offlineRate: 2 } },
+
+    // --- Click tier chain ---------------------------------------------
+    { id: 'h_click2',  name: 'Serenity of touch', cost: 8,  desc: 'Clicking power x2.',                    req: { hUpgrade: 'h_click' }, effect: { clickMult: 2 } },
+    { id: 'h_click3',  name: 'Divine fingers',    cost: 20, desc: 'Each click also earns +5% of your CpS.',req: { hUpgrade: 'h_click2' }, effect: { clickCpsPct: 0.05 } },
+
+    // --- Global-production tier chain ----------------------------------
+    { id: 'h_cps2',    name: 'Radiant grace',     cost: 30, desc: 'All cookie production x1.5.',           req: { hUpgrade: 'h_cps' },   effect: { allMult: 1.5 } },
+    { id: 'h_cps3',    name: 'Eternal radiance',  cost: 80, desc: 'All cookie production x2.',             req: { hUpgrade: 'h_cps2' },  effect: { allMult: 2 } },
+
+    // --- Golden-cookie tier chain --------------------------------------
+    { id: 'h_frenzy',  name: 'Divine fervor',     cost: 40, desc: 'Frenzies are x10 and last a full 30 seconds.', req: { hUpgrade: 'h_gc' }, effect: { frenzyMult: 10, frenzyDur: 30000 } },
+    { id: 'h_lucky',   name: "Fortune's smile",   cost: 45, desc: 'Lucky cookies pay out x2.5 more.',      req: { hUpgrade: 'h_gc' }, effect: { luckyPct: 2.5 } },
+
+    // --- Offline tier chain ---------------------------------------------
+    { id: 'h_offline2',name: 'Ageless ovens',     cost: 100,desc: 'Offline earnings last up to 48 hours and pay triple.', req: { hUpgrade: 'h_offline' }, effect: { offlineHours: 48, offlineRate: 3 } },
+
+    // --- Standalone blessings -------------------------------------------
+    { id: 'h_grant',   name: 'Heavenly grant',    cost: 35, desc: 'After ascending you keep 2% of the cookies baked this run.', effect: { keepPct: 0.02 } },
+    { id: 'h_cost',    name: 'Bargain heaven',    cost: 60, desc: 'All buildings cost 25% less.',           effect: { buildingCostMult: 0.75 } },
+    { id: 'h_ascend',  name: 'Ascendant soul',    cost: 75, desc: '+5% to all cookie production per ascension performed (stacks forever).', effect: { perAscension: 0.05 } },
+    { id: 'h_chip',    name: "Angel's favor",     cost: 120,desc: 'Every heavenly chip boosts production by +4% instead of +2%.', effect: { chipBonusAdd: 0.02 } }
   ];
 
   /* ---------------- Achievements -------------------------------------
@@ -101,7 +127,7 @@
     { id: 'a_bake1e5',   name: 'Crumb tycoon',         desc: 'Bake 100,000 cookies.',             hint: 'Bake 100K cookies in total. Mid-game territory — your buildings are doing most of the work now.', check: function (s) { return s.allBaked >= 1e5; } },
     { id: 'a_bake1e6',   name: 'Millionaire of crumbs',desc: 'Bake 1 million cookies.',           hint: 'Bake 1M cookies total. Keep buying buildings and upgrades — output compounds.', check: function (s) { return s.allBaked >= 1e6; } },
     { id: 'a_bake1e8',   name: 'Cookie magnate',       desc: 'Bake 100 million cookies.',         hint: 'Bake 100M cookies in total. Synergy upgrades and golden cookies make this go much faster.', check: function (s) { return s.allBaked >= 1e8; } },
-    { id: 'a_bake1e9',   name: 'Cookie billionaire',   desc: 'Bake 1 billion cookies.',           hint: 'Bake 1B cookies total. Also unlocks your first heavenly chip via ascension (Heaven tab).', check: function (s) { return s.allBaked >= 1e9; } },
+    { id: 'a_bake1e9',   name: 'Cookie billionaire',   desc: 'Bake 1 billion cookies.',           hint: 'Bake 1B cookies total. Ascension (Heaven tab) pays out its first heavenly chips at 500M baked in a single run.', check: function (s) { return s.allBaked >= 1e9; } },
     { id: 'a_bake1e12',  name: 'Trillion-touched',     desc: 'Bake 1 trillion cookies.',          hint: 'Bake 1T cookies total. Late-game empire work — heavenly chips and shop items help a lot.', check: function (s) { return s.allBaked >= 1e12; } },
     { id: 'a_cps10',     name: 'Production line',      desc: 'Reach 10 CpS.',                     hint: 'Get your cookies-per-second to 10. Buy buildings (Cursors are +0.1/s each) and upgrades.', check: function (s, c) { return c.cps() >= 10; } },
     { id: 'a_cps100',    name: 'Rolling dough',        desc: 'Reach 100 CpS.',                    hint: 'Get your cookies-per-second to 100. A handful of farms plus a doubling upgrade gets there quickly.', check: function (s, c) { return c.cps() >= 100; } },
@@ -120,8 +146,8 @@
     { id: 'a_frenzy',    name: 'Frenzy state',         desc: 'Be in a frenzy.',                   hint: 'Click a golden cookie — it can trigger Frenzy, multiplying CpS by x7 for 18 seconds.', check: function (s, c) { return c.inFrenzy(); } },
     { id: 'a_frenzy5',   name: 'Frenzy fanatic',       desc: 'Ride out 5 frenzies.',              hint: 'Experience 5 frenzy buffs total (each starts from a lucky golden cookie). The count is tracked in Statistics.', check: function (s) { return s.stats.frenzies >= 5; } },
     { id: 'a_time30m',   name: 'Dough marathon',       desc: 'Play for 30 minutes.',              hint: 'Accumulate 30 total minutes of playtime — see Time played in the Statistics panel.', check: function (s) { return s.stats.playtimeMs >= 30 * 60e3; } },
-    { id: 'a_ascend',    name: 'Ascended',             desc: 'Perform an ascension.',             hint: 'Bake 1B cookies this run, open the Heaven tab in the store, and press Ascend. You keep achievements + heavenly shop, gain a permanent +2% per chip.', check: function (s) { return s.stats.ascensions >= 1; } },
-    { id: 'a_ascend2',   name: 'Second heaven',        desc: 'Perform a second ascension.',       hint: 'Ascend twice. After your first ascension, keep baking to 1B cookies this run and ascend again for more chips.', check: function (s) { return s.stats.ascensions >= 2; } },
+    { id: 'a_ascend',    name: 'Ascended',             desc: 'Perform an ascension.',             hint: 'Bake 500M cookies this run, open the Heaven tab in the store, and press Ascend. You keep achievements + heavenly shop, gain a permanent production bonus per chip.', check: function (s) { return s.stats.ascensions >= 1; } },
+    { id: 'a_ascend2',   name: 'Second heaven',        desc: 'Perform a second ascension.',       hint: 'Ascend twice. After your first ascension, keep baking to 500M cookies this run and ascend again for more chips. The Ascendant soul blessing rewards you for every ascension ever performed.', check: function (s) { return s.stats.ascensions >= 2; } },
     { id: 'a_chips10',   name: 'Chip hoarder',         desc: 'Hold 10 heavenly chips.',           hint: 'Bank 10 heavenly chips from ascensions. Chips are spent in the Heavenly shop — keep some in reserve!', check: function (s) { return s.chips >= 10; } }
   ];
 
@@ -170,7 +196,7 @@
       LUCKY_CPS_SECONDS: 600,     // lucky payout = max(13, cps * this)
       OFFLINE_MIN_MS: 60000,      // ignore absences shorter than 1 minute
       OFFLINE_CAP_HOURS: 8,       // default offline earning cap
-      ASCEND_DIVISOR: 1e9         // chips = floor((runBaked / divisor)^0.4)
+      ASCEND_DIVISOR: 5e8         // chips = floor((runBaked / divisor)^0.4) — first chip at 500M baked this run
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

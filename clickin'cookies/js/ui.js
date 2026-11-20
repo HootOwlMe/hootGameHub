@@ -19,6 +19,7 @@
   let lastGoldenRef = null;  // to detect spawn transitions
   let tipVisibleId = null;   // upgrade id currently shown in the tooltip (null when hidden)
   const lastMouse = { x: 0, y: 0 }; // last pointer position over a tooltip host (viewport coords)
+  let touchInput = false;   // true when the newest pointerdown came from a finger/stylus (no hover available)
 
   /* ---------------- small helpers ------------------------------------ */
   function el(tag, cls, text) {
@@ -102,7 +103,8 @@
     grid.addEventListener('click', function (e) {
       const tile = e.target.closest('.upg-tile');
       if (!tile || tile.classList.contains('hidden')) return;
-      if (CC.buyUpgrade(tile.dataset.id)) flashRow(tile);
+      // Touch: first tap shows the description, second tap on the same tile buys.
+      if (tapGate('upg', tile.dataset.id, e.clientX, e.clientY) && CC.buyUpgrade(tile.dataset.id)) flashRow(tile);
     });
   }
 
@@ -136,6 +138,48 @@
     tipEl.style.top = Math.max(4, top) + 'px';
   }
   function hideTip() { tipEl.classList.add('hidden'); tipVisibleId = null; }
+
+  // Tooltip for heavenly blessings. Rows already show name/cost/desc inline,
+  // but on touch the first tap deserves a proper card too — including WHY an
+  // item is LOCKED (the native title attribute never appears on phones).
+  function showHTip(id, x, y) {
+    const h = CC.hUpgradeById(id);
+    if (!h) return;
+    tipVisibleId = id;
+    const owned = CC.S.hUpgrades.indexOf(id) >= 0;
+    let html = '<div class="tip-name">' + (owned ? '\u2605 ' : '') + h.name + '</div>' +
+               '<div class="tip-cost">Cost: ' + F.int(h.cost) + ' chips</div>' +
+               '<div class="tip-desc">' + h.desc + '</div>';
+    if (!CC.hReqMet(h)) {
+      const pre = CC.hUpgradeById(h.req ? h.req.hUpgrade : null);
+      html += '<div class="tip-req">Locked \u2014 buy "' + (pre ? pre.name : 'the previous blessing') + '" first.</div>';
+    }
+    tipEl.innerHTML = html;
+    tipEl.classList.remove('hidden');
+    const r = tipEl.getBoundingClientRect();
+    let left = Math.min(x + 14, window.innerWidth - r.width - 8);
+    let top = Math.min(y + 16, window.innerHeight - r.height - 8);
+    tipEl.style.left = Math.max(4, left) + 'px';
+    tipEl.style.top = Math.max(4, top) + 'px';
+  }
+
+  /* ---------- tap-to-inspect-then-buy (touch devices) ------------------
+   * Phones have no hover. On touch input the FIRST tap on an upgrade tile or
+   * heavenly row only shows its description; a second tap on the SAME item
+   * attempts the purchase. Mouse/keyboard keeps the classic instant-buy.
+   */
+  let armedForBuy = null; // { kind: 'upg'|'h', id } whose description is on screen, awaiting confirm tap
+  function tapGate(kind, id, x, y) {
+    if (!touchInput) return true; // mouse/keyboard: legacy instant-buy path
+    if (armedForBuy && armedForBuy.kind === kind && armedForBuy.id === id) {
+      armedForBuy = null;
+      hideTip();
+      return true; // second tap on the same item -> buy it
+    }
+    armedForBuy = { kind: kind, id: id };
+    if (kind === 'upg') showTip(id, x, y); else showHTip(id, x, y);
+    return false; // first tap -> description only
+  }
 
   // Re-point the tooltip at whatever tile is actually under the last mouse
   // position. Called after a visibility change reflows the grid while the
@@ -203,12 +247,71 @@
 
       const state = el('div', 'h-state', '');
       li.appendChild(sprite); li.appendChild(info); li.appendChild(state);
-      li.addEventListener('click', function () {
-        if (CC.buyHUpgrade(h.id)) flashRow(li);
+      li.addEventListener('click', function (ev) {
+        // Touch: first tap shows the description card, second tap buys.
+        if (tapGate('h', h.id, ev.clientX, ev.clientY) && CC.buyHUpgrade(h.id)) flashRow(li);
       });
       ul.appendChild(li);
       hRows[h.id] = { li: li, cost: info.children[1], state: state };
     });
+  }
+
+  /** Per-row heavenly-shop state: owned / locked-behind-prereq / buyable. */
+  function refreshHeavenShop() {
+    const S = CC.S;
+    D.H_UPGRADES.forEach(function (h) {
+      const r = hRows[h.id];
+      const owned = S.hUpgrades.indexOf(h.id) >= 0;
+      if (owned) {
+        r.cost.textContent = '';
+        r.state.textContent = 'OWNED';
+        r.li.classList.remove('cant', 'req');
+        r.li.classList.add('owned');
+        r.li.title = h.desc + ' (owned — permanent, survives ascension)';
+      } else if (!CC.hReqMet(h)) {
+        const pre = CC.hUpgradeById(h.req.hUpgrade);
+        r.cost.textContent = F.int(h.cost) + ' chips';
+        r.state.textContent = 'LOCKED';
+        r.li.classList.remove('owned');
+        r.li.classList.add('cant', 'req');
+        r.li.title = 'Locked — buy "' + pre.name + '" first.';
+      } else {
+        r.cost.textContent = F.int(h.cost) + ' chips';
+        r.state.textContent = '';
+        r.li.classList.remove('owned', 'req');
+        r.li.classList.toggle('cant', S.chips < h.cost);
+        r.li.title = h.desc;
+      }
+    });
+  }
+
+  /** Ascension box: potential chips, next-chip progress bar, grant note. */
+  function refreshAscendBox() {
+    const S = CC.S;
+    const pot = CC.potentialChips();
+    $('ascend-earn').textContent = 'You would earn ' + F.int(pot) + ' heavenly chip' + (pot === 1 ? '' : 's') + '.';
+    $('btn-ascend').disabled = pot < 1;
+
+    const nextAt = CC.nextChipAt();
+    const prog = Math.max(0, Math.min(1, S.runBaked / nextAt));
+    const bar = $('ascend-progress-bar');
+    if (bar) bar.style.width = (prog * 100).toFixed(2) + '%';
+
+    let line = 'Next chip at ' + F.fmt(nextAt) + ' baked this run · each chip +' + Math.round(CC.chipBonus() * 100) + '% production';
+    const ap = CC.ascensionBonusRate();
+    if (ap > 0 && S.stats.ascensions > 0) line += ' · ascended bonus +' + (S.stats.ascensions * ap * 100).toFixed(0) + '%';
+    $('next-chip-at').textContent = line;
+
+    const grantEl = $('ascend-grant');
+    if (grantEl) {
+      const keepPct = CC.hEffect('keepPct');
+      if (keepPct !== null && S.runBaked > 0) {
+        grantEl.textContent = 'Heavenly grant: you will keep ' + Math.round(keepPct * 100) + '% of this run (' + F.fmt(S.runBaked * keepPct) + ' cookies).';
+        grantEl.classList.remove('hidden');
+      } else {
+        grantEl.classList.add('hidden');
+      }
+    }
   }
 
   /* ---------------- build: stats + achievements ------------------------- */
@@ -295,18 +398,8 @@
 
     // Heavenly panel
     $('chip-mini').textContent = S.chips > 0 ? F.int(S.chips) + ' ◆' : '';
-    D.H_UPGRADES.forEach(function (h) {
-      const r = hRows[h.id];
-      const owned = S.hUpgrades.indexOf(h.id) >= 0;
-      r.cost.textContent = owned ? '' : F.int(h.cost) + ' chips';
-      r.state.textContent = owned ? 'OWNED' : '';
-      r.li.classList.toggle('owned', owned);
-      r.li.classList.toggle('cant', !owned && S.chips < h.cost);
-    });
-
-    const pot = CC.potentialChips();
-    $('ascend-earn').textContent = 'You would earn ' + F.int(pot) + ' heavenly chip' + (pot === 1 ? '' : 's') + '.';
-    $('btn-ascend').disabled = pot < 1;
+    refreshHeavenShop();
+    refreshAscendBox();
 
     syncArmy();
 
@@ -328,8 +421,11 @@
   }
 
   function globalAllOf() {
+    // Display-only mirror of the engine's globalAll — keep in sync with game.js.
     const S = CC.S;
-    let m = (1 + T.CHIP_BONUS * S.chips) * (1 + T.ACHIEVEMENT_BONUS * S.achievements.length);
+    let m = (1 + CC.chipBonus() * S.chips) * (1 + T.ACHIEVEMENT_BONUS * S.achievements.length);
+    const ap = CC.ascensionBonusRate();
+    if (ap > 0) m *= 1 + ap * S.stats.ascensions;
     D.UPGRADES.forEach(function (u) { if (u.effect && u.effect.allMult && S.upgrades.indexOf(u.id) >= 0) m *= u.effect.allMult; });
     D.H_UPGRADES.forEach(function (h) { if (h.effect && h.effect.allMult && S.hUpgrades.indexOf(h.id) >= 0) m *= h.effect.allMult; });
     return m * (CC.buffActive() ? CC.S.buff.mult : 1);
@@ -346,7 +442,7 @@
     $('st-golden').textContent = F.int(S.stats.goldenClicked);
     $('st-frenzies').textContent = F.int(S.stats.frenzies);
     $('st-time').textContent = F.time(S.stats.playtimeMs);
-    $('st-chips').textContent = F.int(S.chips) + '  (+' + (S.chips * T.CHIP_BONUS * 100).toFixed(0) + '%)';
+    $('st-chips').textContent = F.int(S.chips) + '  (+' + Math.round(CC.chipBonus() * S.chips * 100) + '%)';
     $('st-achbonus').textContent = '+' + (S.achievements.length * T.ACHIEVEMENT_BONUS * 100).toFixed(0) + '% (' + S.achievements.length + '/' + D.ACHIEVEMENTS.length + ')';
     $('st-ascensions').textContent = F.int(S.stats.ascensions);
   }
@@ -602,6 +698,18 @@
     // zooming while fast tapping; preventDefault below suppresses the ghost
     // compat click that would otherwise double-count a touch tap.
     let lastTouchTap = 0;
+
+    // Track the newest input modality: finger/stylus taps get the
+    // inspect-then-buy flow (no hover on phones); mouse clicks buy instantly.
+    document.addEventListener('pointerdown', function (e) {
+      touchInput = !!(e.pointerType && e.pointerType !== 'mouse');
+    }, true);
+    // Tapping anywhere outside an upgrade tile / heavenly row dismisses the
+    // armed description and its pending-buy state.
+    document.addEventListener('click', function (e) {
+      const onItem = e.target.closest ? e.target.closest('.upg-tile, .h-row') : null;
+      if (!onItem && armedForBuy) { armedForBuy = null; hideTip(); }
+    });
 
     const cookieBtn = $('big-cookie');
     function doCookieTap(x, y) {
