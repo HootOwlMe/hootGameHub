@@ -174,6 +174,7 @@ function audioInit() {
     dly.delayTime.value = .42;
     const fb = AC.createGain(), wet = AC.createGain();
     fb.gain.value = .38;
+    MUS.fb = fb;                                       // kept for musCut(): breaking the echo loop on restarts
     wet.gain.value = .5;
     bus.connect(dly);
     dly.connect(fb); fb.connect(dly);
@@ -195,6 +196,7 @@ function tone(f0, f1, t, dur, type, vol, dest) {
   g.connect(dest || sfxOut);
   o.start(t);
   o.stop(t + dur + .05);
+  if (dest === MUS.bus) trackMusic(o);     // music voices are tracked so musCut() can hard-stop them
 }
 
 function sBounce() {
@@ -357,7 +359,12 @@ let CHORDS = [
   { t: [55, 59, 62], b: 43 }
 ];
 let PADWAVE = 'triangle', PADVOL = .05, SPARKWAVE = 'sine';
-const MUS = { step: 0, next: 0, started: false, bus: null };
+const MUS = { step: 0, next: 0, started: false, bus: null, fb: null, live: [] };   // live: scheduled music voices, hard-stopped on restart
+
+function trackMusic(o) {                   // remember a scheduled music voice so musCut() can stop it mid-song
+  MUS.live.push(o);
+  o.onended = () => { const i = MUS.live.indexOf(o); if (i >= 0) MUS.live.splice(i, 1); };
+}
 
 function pad(notes, t) {
   const dur = EIGHTH * 8;
@@ -373,6 +380,7 @@ function pad(notes, t) {
     g.connect(MUS.bus);
     o.start(t);
     o.stop(t + dur + .1);
+    trackMusic(o);
   }
 }
 
@@ -397,6 +405,18 @@ function musTick() {
     MUS.step = (MUS.step + 1) % (CHORDS.length * 8);
     MUS.next += EIGHTH;
   }
+}
+function musCut() {                                    // kill already-scheduled notes + echo tail (R / start mid-song)
+  if (!AC || !MUS.bus) return;
+  const t = AC.currentTime;
+  for (const o of MUS.live) { try { o.stop(); } catch (e) {} }   // hard-stop every pending music voice at its source
+  MUS.live.length = 0;
+  MUS.bus.gain.cancelScheduledValues(t); MUS.fb.gain.cancelScheduledValues(t);
+  MUS.bus.gain.setValueAtTime(MUS.bus.gain.value, t);
+  MUS.bus.gain.linearRampToValueAtTime(0, t + .015);   // tiny dip to mask the hard-stop clicks
+  MUS.fb.gain.setValueAtTime(0, t);                    // break the feedback loop so the delay line drains dry
+  MUS.bus.gain.linearRampToValueAtTime(1, t + .05);    // fresh notes come in clean
+  MUS.fb.gain.setTargetAtTime(.38, t + .12, .08);
 }
 setInterval(musTick, 40);
 
@@ -844,7 +864,8 @@ function start() {
   pt = [];
   en = []; bj = []; ups = [];
   boost = 0; seenUp = false;
-  shld = Math.min(1, S.up.ward); goldT = 0; seenShld = false; seenGold = false;           // Warding Sigil rank 1: start shielded
+  shldCap = 1 + S.up.aegis;                             // Aegis Plating: shield holds up to 3 pellets
+  shld = S.up.ward > 0 ? shldCap : 0; goldT = 0; seenShld = false; seenGold = false;      // Warding Sigil rank 1: start with a full-charge shield
   revives = S.up.revive; invuln = 0;
   spdMile = 0; seenEn = false;
   upB = 1 + .08 * S.up.bounce;     // Higher Bounce
@@ -854,7 +875,6 @@ function start() {
   mendIv = S.up.ward >= 2 ? 31 - 5 * S.up.ward : 0; mendT = 0;   // Warding Sigil ranks 2–4: +1 shield every 21/16/11s
   luckM = 1 + .5 * S.up.luck;                          // Gilded Luck: power-up spawn odds
   calmM = 1 - .07 * S.up.calm;                         // Tide Calmer: slows enemy bolts
-  shldCap = 1 + S.up.aegis;                             // Aegis Plating: shield holds up to 3 pellets
   goldDurM = 1 + .1 * S.up.goldx;                       // Golden Tide: +10% golden-shelf duration per rank
   fl = []; flyT = rn(2.5, 5); seenFly = false; camRate = 0;   // deep drifters (depth 6k+)
   nextY = cam + firstY;
@@ -885,7 +905,8 @@ function start() {
   m.textContent = HINT;
 
   audioInit();
-  if (!MUS.started) { MUS.started = true; MUS.next = AC.currentTime + .15; }
+  musCut();                                            // silence the tail of the previous progression before the new one starts
+  MUS.started = true; MUS.next = AC.currentTime + .12; // first new note lands after the musCut dip recovers — clean downbeat
   sStart();
 }
 
@@ -898,7 +919,7 @@ function end() {
     if (host) { P.x = host.x + host.w / 2; P.y = host.y - P.r; }   // land on the highest shelf in view
     else { P.x = W / 2; P.y = cam + H * .38; }
     P.vx = 0; P.vy = B * .9;
-    shld = Math.max(shld, 1);                              // arrive protected
+    shld = Math.max(shld, shldCap);                        // arrive protected — full charges with Aegis Plating
     invuln = 2.5;                                          // brief grace while the field settles
     burst(P.x, P.y, 24, '#bfefff');
     sPower();
@@ -1088,10 +1109,10 @@ function up(dt) {
     if (Math.hypot(k.x - P.x, k.y - P.y) <= k.r + P.r) {
       ups.splice(i, 1);
       if (k.kind === 'shield') {
-        shld = Math.min(shldCap, shld + 1);
+        shld = shldCap;                                // a shield grant is always fully charged (Aegis Plating widens the capacity)
         burst(k.x, k.y, 18, '#7fd8ff');
         sShield();
-        if (!seenShld) { seenShld = true; hint('shield — blocks one wisp bolt'); }
+        if (!seenShld) { seenShld = true; hint('shield — blocks ' + shldCap + ' wisp bolt' + (shldCap > 1 ? 's' : '')); }
       } else if (k.kind === 'gold') {
         goldT = GOLD_DUR * goldDurM;                  // Golden Tide extends the golden rain
         burst(k.x, k.y, 20, '#ffd27a');
