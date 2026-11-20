@@ -117,8 +117,9 @@
    * + bankPct × the player's CURRENT cookie bank, so they always cost a
    * meaningful slice of what you have on hand. Repurchasing while active
    * re-arms the full duration.
-   * effect: prodMult  → multiplies all production for durMs
-   *         clickMult → multiplies clicking power for durMs
+   * effect: prodMult       → multiplies all production for durMs
+   *        clickMult      → multiplies clicking power for durMs
+   *        suppressGolden → no golden cookies appear while the buff is active
    * ------------------------------------------------------------------ */
   /* Temporary power-ups ("Consumables" store tab).
    * Price = baseCost + bankPct × current cookie bank (evaluated at purchase),
@@ -130,9 +131,9 @@
    * stack on top of golden-cookie frenzy. */
   const CONSUMABLES = [
     { id: 'c_soda',   name: 'Crumb soda',       baseCost: 2e4,   bankPct: 0.03, durMs: 900000,  cooldownMs: 600000,  effect: { clickMult: 11 },          desc: 'Clicking power x11 for 15 minutes.' },
-    { id: 'c_frenzy', name: 'Frenzy in a can',  baseCost: 5e5,   bankPct: 0.04, durMs: 30000,  cooldownMs: 900000,  effect: { prodMult: 7 },           desc: 'All cookie production x7 for 30 seconds.' },
-    { id: 'c_storm',  name: 'Cookie storm',     baseCost: 2e7,   bankPct: 0.06, durMs: 180000, cooldownMs: 1500000, effect: { prodMult: 3 },           desc: 'All cookie production x3 for a long 3 minutes.' },
-    { id: 'c_burst',  name: 'Antimatter shakeup', baseCost: 1e8,   bankPct: 0.90, durMs: 240000, cooldownMs: 1800000, effect: { prodMult: 15, clickMult: 15 }, desc: 'EVERYTHING x15 for a full 4 minutes.' }
+    { id: 'c_frenzy', name: 'Frenzy in a can',  baseCost: 5e5,   bankPct: 0.14, durMs: 30000,  cooldownMs: 900000,  effect: { prodMult: 7 },           desc: 'All cookie production x7 for 30 seconds.' },
+    { id: 'c_storm',  name: 'Cookie storm',     baseCost: 2e7,   bankPct: 0.25, durMs: 180000, cooldownMs: 1500000, effect: { prodMult: 3 },           desc: 'All cookie production x3 for a long 3 minutes.' },
+    { id: 'c_burst',  name: 'Antimatter shakeup', baseCost: 1e8,   bankPct: 0.90, durMs: 240000, cooldownMs: 1800000, effect: { prodMult: 15, clickMult: 15, suppressGolden: true }, desc: 'EVERYTHING x15 for a full 4 minutes. No golden cookies appear while it runs.' }
   ];
 
   /* ---------------- Achievements -------------------------------------

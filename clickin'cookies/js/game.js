@@ -361,6 +361,18 @@
     return p;
   }
 
+  /** True while any ACTIVE consumable buff suppresses golden-cookie spawns
+   *  (data flag effect.suppressGolden — Antimatter shakeup). */
+  function goldenSuppressed() {
+    const t = now();
+    for (const id in S.consumableBuffs) {
+      if (S.consumableBuffs[id].until <= t) continue;
+      const c = consumableById(id);
+      if (c && c.effect && c.effect.suppressGolden) return true;
+    }
+    return false;
+  }
+
   function spawnGolden() { S.goldenActive = { leftMs: T.GOLDEN_LIFE_MS }; }
 
   /** Player clicked the golden cookie. Returns {type, text, amount?} or null.
@@ -433,7 +445,12 @@
 
     addCookies(cps() * dt / 1000);
 
+    // Golden cookies don't appear while an active consumable suppresses them
+    // (Antimatter shakeup): the spawn countdown pauses and resumes when it ends.
+    const gcSuppressed = goldenSuppressed();
+
     if (S.goldenActive) {
+      // A cookie already on screen keeps its lifetime — suppression only stops NEW spawns.
       S.goldenActive.leftMs -= dt;
       if (S.goldenActive.leftMs <= 0) {
         S.goldenActive = null;
@@ -442,7 +459,7 @@
         // golden cookie on the very next tick.
         S.nextGoldenIn = gcIntervalMs();
       }
-    } else {
+    } else if (!gcSuppressed) {
       S.nextGoldenIn -= dt;
       if (S.nextGoldenIn <= 0) spawnGolden();
     }
@@ -578,6 +595,7 @@
     spawnGoldenForTest: spawnGolden,
     goldenClick: goldenClick,
     buffActive: buffActive,
+    goldenSuppressed: goldenSuppressed,
     checkAchievements: checkAchievements,
     totalBuildings: totalBuildings,
     potentialChips: potentialChips,
