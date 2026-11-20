@@ -6,7 +6,7 @@
  * Economy model (see README.md for details & deviations from original):
  *   cps      = Σ(units × unitCps × buildingMults) × globalAll × buffMult
  *   globalAll= (1 + 2%·chips) × (1 + 2%·achievements) × Π(allMult upgrades)
- *   click    = (1 + baseClickAdds) × Π(clickMults) + cps × Σ(clickCpsPct)
+ *   click    = [(1 + baseClickAdds) × Π(clickMults) + cps × Σ(clickCpsPct)] × frenzy
  *   cost(nth) = ceil(baseCost × 1.15^owned)
  * ===================================================================*/
 (function (global) {
@@ -122,7 +122,9 @@
     for (const h of D.H_UPGRADES) if (S.hUpgrades.indexOf(h.id) >= 0 && h.effect) {
       if (h.effect.baseClickAdd) base += h.effect.baseClickAdd;
     }
-    return base * mult + cps() * pct;
+    // Frenzy multiplies ALL production, clicks included. The CpS term is
+    // already buffed inside cps(); this covers the base × mult part as well.
+    return (base * mult + cps() * pct) * (buffActive() ? S.buff.mult : 1);
   }
 
   /** Player clicked the big cookie. Returns cookies gained. */

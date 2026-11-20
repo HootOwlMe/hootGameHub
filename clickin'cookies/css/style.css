@@ -111,7 +111,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 
 #big-cookie {
   background: none; border: none; padding: 0;
-  width: min(280px, 62vw); height: min(280px, 62vw);
+  /* +10 px diameter vs the original size (both branches shifted up) */
+  width: min(290px, calc(62vw + 10px)); height: min(290px, calc(62vw + 10px));
   filter: drop-shadow(0 14px 28px rgba(0, 0, 0, .55));
   transition: transform .07s ease;
 }
@@ -339,7 +340,10 @@ body.resizing { cursor: col-resize; user-select: none; }
 /* =====================================================================
    MIDDLE PANEL — news + store
    ===================================================================*/
-#panel-mid { display: flex; flex-direction: column; background: #e9e6dd; color: #2b2f38; min-width: 0; }
+/* overflow:hidden zeroes this grid item's auto min-height, so tall store
+   content can NEVER stretch the row (that used to shove the big cookie out
+   of view) — scrolling happens inside #store-scroll instead. */
+#panel-mid { display: flex; flex-direction: column; background: #e9e6dd; color: #2b2f38; min-width: 0; overflow: hidden; }
 
 #news-bar {
   height: 40px; flex: none; display: flex; align-items: center;
@@ -397,6 +401,7 @@ body.resizing { cursor: col-resize; user-select: none; }
   display: flex; align-items: center; gap: 12px;
   background: linear-gradient(180deg, #f7f5ef, #eceade);
   border: 1px solid #c9c4b6; border-radius: 10px;
+  min-height: 138px; /* ~10% shorter than 153 px — still a comfy tap target */
   padding: 8px 12px; cursor: pointer; user-select: none;
   transition: transform .06s ease, box-shadow .12s ease;
 }
@@ -408,12 +413,13 @@ body.resizing { cursor: col-resize; user-select: none; }
 @keyframes rowFlash { 0% { box-shadow: 0 0 0 3px #ffd97a; } 100% { box-shadow: none; } }
 
 .b-info { flex: 1; min-width: 0; }
-.b-name { font-size: 16px; font-weight: 700; color: #2b2f38; }
-.b-cost { font-size: 13px; color: #4a5060; margin-top: 1px; }
-.b-cps { margin-top: 1px; }
+/* row text sizes are +25% vs the originals (16/13/12/22 px) */
+.b-name { font-size: 20px; font-weight: 700; color: #2b2f38; }
+.b-cost { font-size: 16.25px; color: #4a5060; margin-top: 1px; }
+.b-cps { margin-top: 1px; font-size: 15px; } /* .muted base is 12 px */
 .b-owned {
   flex: none; min-width: 54px; text-align: center;
-  font-size: 22px; font-weight: 800; color: #8a6d2f;
+  font-size: 27.5px; font-weight: 800; color: #8a6d2f;
 }
 
 /* --- upgrade grid ------------------------------------------------------ */
@@ -540,6 +546,9 @@ body.resizing { cursor: col-resize; user-select: none; }
   display: flex; align-items: center; justify-content: center;
 }
 .sprite .art { position: relative; display: block; width: 72%; height: 72%; }
+/* Building purchase rows get double-size icon tiles (100 px) so custom PNGs
+   show real detail. Upgrade-grid tiles keep the compact 50 px base size. */
+.b-row .sprite { width: 85px; height: 85px; border-radius: 14px; } /* ~15% smaller than 100 px */
 
 /* cursor — white pointer arrow */
 .sprite--cursor .art {

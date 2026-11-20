@@ -1,0 +1,45 @@
+/* =====================================================================
+   Custom sprites — overrides for css/style.css (linked AFTER it in
+   index.html, so these plain rules win). All four images have transparent
+   corners, so the placeholder shapes/rounding stay safe to keep.
+   Images live NEXT TO this file in assets/, so URLs are relative to here
+   (NOT 'assets/...'). See README.md → "Replacing the placeholder sprites".
+   ===================================================================*/
+
+/* --- Big cookie ------------------------------------------------------ */
+.cookie-art {
+  background: url('cookie.png') center / contain no-repeat;
+  box-shadow: none; /* drop the CSS-drawn shading — the image brings its own */
+}
+
+/* --- Golden cookie (glow hugs the texture) ----------------------------- */
+/* golden.png carries transparent padding: the visible cookie only fills
+   ~77% of the image frame. A plain border-radius shadow would ring that
+   padding, so the glow is drawn on a centered ::after circle sized to the
+   actual texture instead (measured from the PNG's alpha bbox). */
+.golden-art {
+  background: url('golden.png') center / contain no-repeat;
+  box-shadow: none;
+}
+.golden-art::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 77%; aspect-ratio: 1 / 1; transform: translate(-50%, -50%);
+  border-radius: 50%; box-shadow: 0 0 22px rgba(255, 210, 74, .85);
+}
+
+/* --- Building icons (.art sits in a 50×50 tile → use contain) ---------- */
+.sprite--cursor .art {
+  width: 72%; height: 72%; /* match the other tiles' icon size (was 58%×64%) */
+  background: url('cursor.png') center / contain no-repeat;
+  clip-path: none; /* placeholder was an arrow clip — the image has its own shape */
+  filter: none;    /* drop the placeholder's drop-shadow */
+}
+
+.sprite--grandma .art {
+  /* The portrait is a band at the TOP of grandma.png's tall canvas (y=2..219
+     of 588). Size to the box width so the face fills the tile, and pin the
+     image with an explicit Y offset (measured from the PNG's alpha bbox) so
+     the band sits centered in the square — 'center' would clip her head. */
+  background: url('grandma.png') center 7.25px / 100% auto no-repeat;
+  border-radius: 0; /* don't crop the portrait into a circle */
+}
