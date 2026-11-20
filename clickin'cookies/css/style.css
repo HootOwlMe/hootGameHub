@@ -661,8 +661,9 @@ body.resizing { cursor: col-resize; user-select: none; }
   filter: saturate(1.25) drop-shadow(0 0 6px rgba(142, 92, 255, .7));
 }
 
-/* prism — rainbow triangle */
-.sprite--prism .art {
+/* prism — rainbow triangle (building tile + the all_1/2/3 upgrade icons) */
+.sprite--prism .art,
+.icon-prism .art {
   width: 72%; height: 72%;
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
   background: linear-gradient(135deg, #ff5f6d, #ffc37a 40%, #7afcc0 72%, #6aa9ff);
