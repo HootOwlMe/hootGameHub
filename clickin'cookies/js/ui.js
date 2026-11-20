@@ -595,18 +595,47 @@
     // Set true during a hard reset so the unload autosave doesn't re-write
     // the save we just erased (location.reload() fires beforeunload).
     let hardResetting = false;
+    // Touch taps register on pointerdown: instant response (no click delay),
+    // and every finger counts separately, so two-thumb mashing works. Mouse
+    // and pen keep the classic click path, so desktop behavior is unchanged.
+    // CSS `touch-action` (style.css) stops the browser from double-tap-
+    // zooming while fast tapping; preventDefault below suppresses the ghost
+    // compat click that would otherwise double-count a touch tap.
+    let lastTouchTap = 0;
+
     const cookieBtn = $('big-cookie');
-    cookieBtn.addEventListener('click', function (e) {
+    function doCookieTap(x, y) {
       const gain = CC.click();
       const rect = $('fx-layer').getBoundingClientRect();
-      spawnClickFx(e.clientX - rect.left, e.clientY - rect.top, gain);
+      spawnClickFx(x - rect.left, y - rect.top, gain);
       cookieBtn.classList.remove('squish'); void cookieBtn.offsetWidth;
       cookieBtn.classList.add('squish');
+    }
+    cookieBtn.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch') return; // mouse/pen -> click path below
+      e.preventDefault();
+      lastTouchTap = Date.now();
+      doCookieTap(e.clientX, e.clientY);
+    });
+    cookieBtn.addEventListener('click', function (e) {
+      if (Date.now() - lastTouchTap < 400) return; // swallow a touch ghost-click
+      doCookieTap(e.clientX, e.clientY);
     });
 
-    $('golden').addEventListener('click', function () {
+    const goldenBtn = $('golden');
+    function doGoldenTap() {
       const info = CC.goldenClick();
       if (info) toast(info.type === 'frenzy' ? 'frenzy' : 'lucky', info.text);
+    }
+    goldenBtn.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch') return;
+      e.preventDefault();
+      lastTouchTap = Date.now();
+      doGoldenTap();
+    });
+    goldenBtn.addEventListener('click', function () {
+      if (Date.now() - lastTouchTap < 400) return;
+      doGoldenTap();
     });
 
     // Tabs

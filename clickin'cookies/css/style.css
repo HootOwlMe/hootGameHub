@@ -21,6 +21,25 @@ body {
 }
 
 button { font-family: inherit; cursor: pointer; }
+
+/* ---- mobile fast-tap hardening ---------------------------------------
+   Rapid tapping must not trigger the browser's double-tap-zoom / long-press
+   callout gestures (the source of the "zooming + window size" glitches on
+   phones). `touch-action: manipulation` removes double-tap zoom ONLY —
+   pinch-zoom and page scrolling keep working. The big cookie is a pure game
+   object, so it gets `touch-action: none`: taps on it never pan or zoom at
+   all (ui.js registers its touch taps via pointerdown for instant response).
+   Desktop mouse behavior is unaffected by any of this. */
+button { -webkit-tap-highlight-color: transparent; }
+#big-cookie {
+  touch-action: none;
+  user-select: none; -webkit-user-select: none;
+}
+button, .b-row, .h-row, .upg-tile {
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none; /* no iOS long-press callout while mashing */
+}
 .hidden { display: none !important; }
 .muted { color: #93a0b4; font-size: 12px; }
 
