@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- maximum-scale/user-scalable: honored by Android & most browsers. Modern
+     iOS ignores it (accessibility), so js/ui.js additionally blocks pinch
+     gestures in JS — see "Mobile viewport lock" there. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Cookie Clicker — Offline Clone</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">

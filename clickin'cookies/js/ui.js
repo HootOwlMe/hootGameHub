@@ -685,6 +685,32 @@
     document.addEventListener('visibilitychange', function () { if (!hardResetting && document.hidden) CC.save(); });
   }
 
+  /* ---------------- mobile viewport lock ----------------------------------
+   * An accidental two-finger pinch zooms the page and leaves it at a
+   * fractional visual scale, where iOS re-rasterizes every running CSS
+   * animation frame-by-frame — that's what makes the view wiggle/jump
+   * slowly (the milk waves, bubbles, cursor army, golden pulse). So:
+   *   1. Block multi-touch pinch gestures in JS (single-finger scrolling is
+   *      untouched; modern iOS ignores user-scalable=no in the meta tag).
+   *   2. If a zoom slips through anyway (assistive tech etc.), pause the
+   *      decorative animations while scale != 1 — see body.zoomed in CSS.
+   * ------------------------------------------------------------------------ */
+  function initViewportLock() {
+    document.addEventListener('touchmove', function (e) {
+      if (e.touches.length > 1) e.preventDefault(); // kill pinch, keep one-finger scroll
+    }, { passive: false });
+    document.addEventListener('gesturestart', function (e) { e.preventDefault(); }); // WebKit page-level pinch
+
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      const syncZoomed = function () {
+        document.body.classList.toggle('zoomed', Math.abs(vv.scale - 1) > 0.02);
+      };
+      vv.addEventListener('resize', syncZoomed);
+      syncZoomed();
+    }
+  }
+
   /* ---------------- init ------------------------------------------------------ */
   function init() {
     const offline = CC.load();
@@ -695,6 +721,7 @@
     buildStats();
     buildAchievements();
     initResizer();
+    initViewportLock();
     bindEvents();
 
     rotateNews(true);

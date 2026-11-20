@@ -686,6 +686,17 @@ body.resizing { cursor: col-resize; user-select: none; }
   box-shadow: 0 0 10px rgba(142, 92, 255, .75);
 }
 
+/* While the page is zoomed (ui.js toggles body.zoomed from visualViewport):
+   at a fractional scale iOS re-rasterizes running transform animations every
+   frame, so they wiggle/jump. Pause only the DECORATIVE loops — game feedback
+   (counter, click squish, buff bar) is JS-driven and keeps working. */
+body.zoomed #milk .wave,
+body.zoomed #milk .bubble,
+body.zoomed .floaty-cookie,
+body.zoomed #clicker-army,
+body.zoomed #golden,
+body.zoomed .badge { animation-play-state: paused; }
+
 /* =====================================================================
    RESPONSIVE — stack panels on narrow screens
    ===================================================================*/
