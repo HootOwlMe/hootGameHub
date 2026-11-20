@@ -994,10 +994,14 @@ body.resizing { cursor: col-resize; user-select: none; }
    at a fractional scale iOS re-rasterizes running transform animations every
    frame, so they wiggle/jump. Pause only the DECORATIVE loops — game feedback
    (counter, click squish, buff bar) is JS-driven and keeps working. */
+/* NOTE: #clicker-army is deliberately NOT paused here — freezing the ring
+   mid-spin makes a cursor parked off-screen look "missing" on pinch-zoom
+   (mobile magnifies a fixed layout, so part of the 380px ring leaves the
+   visible window). The spin is one small element with tiny sprites — cheap
+   to re-rasterize, unlike the gradient-heavy milk waves above. */
 body.zoomed #milk .wave,
 body.zoomed #milk .bubble,
 body.zoomed .floaty-cookie,
-body.zoomed #clicker-army,
 body.zoomed #golden,
 body.zoomed .badge { animation-play-state: paused; }
 
