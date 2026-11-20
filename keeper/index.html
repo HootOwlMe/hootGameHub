@@ -1054,12 +1054,14 @@ function up(dt) {
     }
     if (invuln <= 0 && Math.hypot(f.x - P.x, f.y - P.y) <= f.r + P.r) {
       if (shld > 0) { shld--; fl.splice(i, 1); burst(P.x, P.y, 20, '#7fd8ff'); sBlock(); hint(shld > 0 ? 'the shield holds — it breaks the drifter (' + shld + ' left)' : 'the shield shattered the drifter'); }
-      else end();
+      else { end(); if (!play) break; }   // run over: stop so a second contact can't pay out again
     }
   }
+  if (!play) return;   // died to a drifter this frame — shop is up, stop simulating
 
   for (let i = bj.length - 1; i >= 0; i--) {
     const b = bj[i];
+    if (!b) continue;   // Second Wind clears the bolt list mid-iteration on a revive
     b.x += b.vx * dt; b.y += b.vy * dt;
     const sy = b.y - cam;
     if (sy < -80 || sy > H + 90 || b.x < -50 || b.x > W + 50) { bj.splice(i, 1); continue; }
@@ -1070,7 +1072,7 @@ function up(dt) {
         burst(P.x, P.y, 20, '#7fd8ff');
         sBlock();
         hint(shld > 0 ? 'the shield holds — ' + shld + ' left' : 'the shield shattered');
-      } else end();
+      } else { end(); if (!play) break; }   // run over: stop so a second pellet can't pay out again
     }
   }
 
@@ -1149,7 +1151,7 @@ function up(dt) {
   }
   pt = pt.filter(q => q.l > 0);
 
-  if (P.y - cam > H + 70) end();
+  if (play && P.y - cam > H + 70) end();
 }
 
 // ---------- player skins ----------
